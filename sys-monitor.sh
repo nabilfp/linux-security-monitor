@@ -1,39 +1,41 @@
-# 🛡️ Linux Security Monitor
+#!/bin/bash
 
-A professional, lightweight Bash-based tool designed to provide an instant overview of system health and security posture. Built specifically for Linux environments (Ubuntu, Arch, Debian).
+# =================================================================
+# Project: Linux Security & System Monitor
+# Description: Quick health and security check for Linux systems.
+# Author: Nabil (Information Systems Student)
+# =================================================================
 
-## 🚀 Instant Usage
-You don't need to install anything. Run this command directly in your terminal:
+# Define Colors for Professional Output
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
 
-```bash
-curl -sL [https://raw.githubusercontent.com/nabilfp/linux-security-monitor/main/sys-monitor.sh](https://raw.githubusercontent.com/nabilfp/linux-security-monitor/main/sys-monitor.sh) | bash
-```
+echo -e "${YELLOW}====================================================${NC}"
+echo -e "${GREEN}      🛡️  LINUX SYSTEM & SECURITY CHECKER 🛡️      ${NC}"
+echo -e "${YELLOW}====================================================${NC}"
+echo -e "Time: $(date)"
+echo -e "System: $(hostname)"
+echo -e "----------------------------------------------------"
 
----
+# 1. System Uptime
+echo -e "\n${GREEN}[+] System Uptime:${NC}"
+uptime -p
 
-## 🛠️ How It's Made (Technical Details)
-This project was developed using **Bash Scripting** and standard Linux binaries. The script automates several manual checks that a System Administrator or SOC Analyst typically performs:
+# 2. Memory Usage
+echo -e "\n${GREEN}[+] Memory Usage:${NC}"
+free -h | awk 'NR==2{printf "Used: %s / Total: %s (%.2f%%)\n", $3,$2,$3*100/$2 }'
 
-1.  **Core Logic:** Uses `awk` and `grep` for data parsing and filtering.
-2.  **Resource Monitoring:** Utilizes `free` and `df` for real-time hardware status.
-3.  **Security Layer:** Implements `ss` (Socket Statistics) to identify listening ports that could be potential entry points for unauthorized access.
-4.  **UI/UX:** Uses ANSI color codes to provide a clear, readable interface in the terminal.
+# 3. Disk Usage (Critical Partitions)
+echo -e "\n${GREEN}[+] Disk Usage:${NC}"
+df -h --output=source,pcent,target -x tmpfs -x devtmpfs | grep '^/'
 
-## ⚠️ Weaknesses & Limitations
-As a lightweight monitoring tool, users should be aware of:
-- **No Persistence:** This script does not save logs to a file (yet). It only shows real-time data.
-- **Root Permissions:** Some security information (like specific process names on ports) might require `sudo` to be fully visible.
-- **Basic Level:** This is a diagnostic tool, not a full-scale Intrusion Detection System (IDS).
+# 4. Security: Check for Open Ports
+echo -e "\n${RED}[!] Active Listening Ports (Security Check):${NC}"
+# Menggunakan 'ss' karena lebih modern daripada 'netstat'
+ss -tunlp | grep LISTEN | awk '{print $1, $5}' | head -n 10
 
-## 🛑 How to Stop
-Since this script runs a sequence of commands and then finishes, it will stop automatically. However, if you want to terminate the execution while it's running, simply press:
-**`Ctrl + C`** on your keyboard.
-
-## 📈 Future Roadmap
-- [ ] Add auto-logging to a `.log` file.
-- [ ] Add Slack/Discord notification alerts.
-- [ ] Add CPU temperature monitoring.
-
----
-**Maintained by:** [Nabil](https://github.com/nabilfp)  
-*Currently pursuing Information Systems degree.*
+echo -e "\n${YELLOW}----------------------------------------------------${NC}"
+echo -e "${GREEN}Analysis Complete. Use Ctrl+C to terminate if needed.${NC}"
+echo -e "${YELLOW}====================================================${NC}"
