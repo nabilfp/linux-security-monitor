@@ -8,7 +8,7 @@ A professional, lightweight Bash-based tool designed to provide an instant overv
 You don't need to install anything. Run this command directly in your terminal:
 
 ```bash
-curl -sL [https://raw.githubusercontent.com/nabilfp/linux-security-monitor/main/sys-monitor.sh](https://raw.githubusercontent.com/nabilfp/linux-security-monitor/main/sys-monitor.sh) | bash
+curl -sL https://raw.githubusercontent.com/nabilfp/linux-security-monitor/main/sys-monitor.sh | bash
 ```
 
 ---
