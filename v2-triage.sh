@@ -30,7 +30,7 @@ log_and_print() {
 # ---------------------------------------------------------------------------
 
 # Clear the terminal screen for better readability before showing the report
-clear
+printf '\033c'
 
 log_and_print "${CYAN}======================================================${RESET}"
 log_and_print "${GREEN}   🛡️  LINUX SECURITY & HEALTH TRIAGE (v2.0-PRO) 🛡️   ${RESET}"
