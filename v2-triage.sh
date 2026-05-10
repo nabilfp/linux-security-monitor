@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ---------------------------------------------------------------------------
-# Script Name    : v2-triage.sh (Universal Edition)
+# Script Name    : v2-triage.sh (Universal Edition - Patch 2)
 # Description    : Advanced System Health, Hardware & Security Triage Tool
 # Author         : Nabil
 # ---------------------------------------------------------------------------
@@ -65,7 +65,7 @@ fi
 root_usage=$(df -h / | tail -n 1 | awk '{print "Used: "$3" / Total: "$2" ("$5")"}')
 echo -e "Storage (/) : $root_usage [Type: $disk_type]"
 
-# 3. Dynamic Thermal Sensors (Cross-Platform Merging Mode)
+# 3. Dynamic Thermal Sensors (With Logic Sanity Check)
 echo -e "\n${YELLOW}[*] THERMAL SENSORS & HARDWARE LIMITS${RESET}"
 
 declare -A sensor_temps
@@ -83,7 +83,6 @@ for hwmon_dir in /sys/class/hwmon/hwmon*; do
         
         temp_c=$((temp_raw / 1000))
         
-        # Cross-Platform Human-Readable Translation
         label_file="${input_file%_input}_label"
         label=$(cat "$label_file" 2>/dev/null)
         
@@ -104,16 +103,22 @@ for hwmon_dir in /sys/class/hwmon/hwmon*; do
             [ -n "$label" ] && human_name="$hwmon_name ($label)"
         fi
         
-        # Seek Critical or Max Limit safely
+        # Limit Sanity Check (Filters out > 200°C dummy values)
         crit_file="${input_file%_input}_crit"
         max_file="${input_file%_input}_max"
         limit="N/A"
         if [ -f "$crit_file" ]; then
             limit_raw=$(cat "$crit_file" 2>/dev/null)
-            [ -n "$limit_raw" ] && limit="$((limit_raw / 1000))°C"
+            if [ -n "$limit_raw" ]; then
+                lim_c=$((limit_raw / 1000))
+                [ "$lim_c" -lt 200 ] && limit="${lim_c}°C"
+            fi
         elif [ -f "$max_file" ]; then
             limit_raw=$(cat "$max_file" 2>/dev/null)
-            [ -n "$limit_raw" ] && limit="$((limit_raw / 1000))°C (Max)"
+            if [ -n "$limit_raw" ]; then
+                lim_c=$((limit_raw / 1000))
+                [ "$lim_c" -lt 200 ] && limit="${lim_c}°C (Max)"
+            fi
         fi
         
         sensor_temps["$human_name"]="${temp_c}°C"
@@ -144,12 +149,14 @@ for zone in /sys/class/thermal/thermal_zone*; do
         if [ "$(cat "$trip_type_file" 2>/dev/null)" == "critical" ]; then
             trip_temp_file="${trip_type_file%_type}_temp"
             limit_raw=$(cat "$trip_temp_file" 2>/dev/null)
-            [ -n "$limit_raw" ] && limit="$((limit_raw / 1000))°C"
+            if [ -n "$limit_raw" ]; then
+                lim_c=$((limit_raw / 1000))
+                [ "$lim_c" -lt 200 ] && limit="${lim_c}°C"
+            fi
             break
         fi
     done
     
-    # Merge only if it doesn't overwrite a more detailed hwmon reading
     if [ -z "${sensor_temps[$human_name]}" ]; then
         sensor_temps["$human_name"]="${temp_c}°C"
         [ "$limit" != "N/A" ] && sensor_limits["$human_name"]="$limit"
@@ -179,8 +186,9 @@ echo -e "$(who)"
 echo -e "\n${CYAN}[+] Active Listening Ports:${RESET}"
 echo -e "$(ss -tuln | awk 'NR>1 {print $1, $5}' | head -n 5)"
 
+# Resource Hogs (With Observer Effect Filter)
 echo -e "\n${CYAN}[+] Top 3 CPU Consuming Processes:${RESET}"
-echo -e "$(ps -eo pid,cmd,%cpu --sort=-%cpu | head -n 4)"
+echo -e "$(ps -eo pid,cmd,%cpu --sort=-%cpu | head -n 5 | grep -v "ps -eo" | head -n 4)"
 
 echo -e "\n${CYAN}======================================================${RESET}"
 echo -e "${GREEN}Triage Complete. (Cross-Platform Edition)${RESET}"
