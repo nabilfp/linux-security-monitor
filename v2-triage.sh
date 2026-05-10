@@ -40,10 +40,6 @@ log_and_print "\n${YELLOW}[*] SYSTEM RESOURCES & HARDWARE${RESET}"
 load_avg=$(uptime | awk -F'load average:' '{ print $2 }' | xargs)
 log_and_print "Load Average   : $load_avg"
 
-# System Uptime
-echo -e "\n[+] System Uptime:${NC}"
-uptime -p
-
 # Memory Allocation
 mem_info=$(free -h | awk 'NR==2{printf "Used: %s / Total: %s (%.2f%%)", $3,$2,$3*100/$2 }')
 log_and_print "Memory Status  : $mem_info"
@@ -51,6 +47,10 @@ log_and_print "Memory Status  : $mem_info"
 # Root Storage
 disk_info=$(df -h / | tail -n 1 | awk '{print "Used: "$3" / Total: "$2" ("$5")"}')
 log_and_print "Root Partition : $disk_info"
+
+# System Uptime
+echo -e "\n[+] System Uptime:${NC}"
+uptime -p
 
 # 2. Security Triage (SOC Analyst Perspective)
 log_and_print "\n${YELLOW}[*] SECURITY POSTURE & THREAT TRIAGE${RESET}"
