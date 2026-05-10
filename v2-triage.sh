@@ -6,21 +6,31 @@
 # Author         : Nabil
 # ---------------------------------------------------------------------------
 
-# Define color codes
+# Define color codes for a professional look
 CYAN='\033[0;36m'
 GREEN='\033[0;32m'
 RED='\033[0;31m'
 YELLOW='\033[1;33m'
 RESET='\033[0m'
 
+# Set dynamic log file location
 LOG_FILE="/tmp/security_audit_$(date +%Y%m%d_%H%M%S).log"
 REPORT_DATA=""
 
+# Function to handle both terminal output and plain text logging
 log_and_print() {
     echo -e "$1"
+    # Strip ANSI color codes to keep the log file clean
     clean_text=$(echo -e "$1" | sed -r "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g")
     REPORT_DATA+="$clean_text\n"
 }
+
+# ---------------------------------------------------------------------------
+# EXECUTION START
+# ---------------------------------------------------------------------------
+
+# Clear the terminal screen for better readability before showing the report
+clear
 
 log_and_print "${CYAN}======================================================${RESET}"
 log_and_print "${GREEN}   🛡️  LINUX SECURITY & HEALTH TRIAGE (v2.0-PRO) 🛡️   ${RESET}"
@@ -33,14 +43,14 @@ log_and_print "OS Release  : $(cat /etc/os-release | grep "PRETTY_NAME" | cut -d
 log_and_print "Kernel      : $(uname -r)"
 log_and_print "Uptime      : $(uptime -p)"
 
-# Detect Public IP (Connectivity triage)
-pub_ip=$(curl -s https://ifconfig.me || echo "Offline")
+# Detect Public IP safely
+pub_ip=$(curl -s https://ifconfig.me || echo "Offline / Unreachable")
 log_and_print "Public IP   : $pub_ip"
 
 # 2. Hardware & Thermal Status
 log_and_print "\n${YELLOW}[*] HARDWARE & THERMAL STATUS${RESET}"
 
-# CPU Temperature (Native reading)
+# CPU Temperature (Native reading without external packages)
 if [ -f /sys/class/thermal/thermal_zone0/temp ]; then
     temp_c=$(( $(cat /sys/class/thermal/thermal_zone0/temp) / 1000 ))
     log_and_print "CPU Temp    : ${temp_c}°C"
@@ -55,20 +65,19 @@ log_and_print "Memory      : $mem_info"
 # 3. Security Analysis (SOC Focus)
 log_and_print "\n${YELLOW}[*] SECURITY & THREAT ANALYSIS${RESET}"
 
-# Check for Failed Login Attempts (Common in SOC Triage)
-# Note: Requires read access to /var/log/auth.log or journalctl
-failed_logins=$(journalctl _SYSTEMD_UNIT=ssh.service | grep "Failed password" | wc -l 2>/dev/null || echo "N/A")
+# Check for Failed Login Attempts (Hunting for brute-force attacks)
+failed_logins=$(journalctl _SYSTEMD_UNIT=ssh.service 2>/dev/null | grep "Failed password" | wc -l || echo "N/A")
 log_and_print "Failed SSH Logins : $failed_logins"
 
 # Active Sessions
 log_and_print "\n${CYAN}[+] Active User Sessions:${RESET}"
 log_and_print "$(who)"
 
-# Network Surface
+# Network Surface (Mapping listening ports)
 log_and_print "\n${CYAN}[+] Active Listening Ports:${RESET}"
 log_and_print "$(ss -tuln | awk 'NR>1 {print $1, $5}' | head -n 5)"
 
-# Resource Hogs (Hunting for anomalies)
+# Resource Hogs (Hunting for anomalies/miners)
 log_and_print "\n${CYAN}[+] Top 3 CPU Consuming Processes:${RESET}"
 log_and_print "$(ps -eo pid,cmd,%cpu --sort=-%cpu | head -n 4)"
 
@@ -76,4 +85,5 @@ log_and_print "\n${CYAN}======================================================${
 log_and_print "${GREEN}Triage Complete. Audit log saved to: $LOG_FILE${RESET}"
 log_and_print "${CYAN}======================================================${RESET}"
 
+# Save the clean report data to the temporary directory
 echo -e "$REPORT_DATA" > "$LOG_FILE"
