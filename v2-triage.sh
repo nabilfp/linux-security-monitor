@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ---------------------------------------------------------------------------
-# Script Name    : v2-triage.sh (Universal Edition - Heuristic Patch)
+# Script Name    : v2-triage.sh
 # Description    : Advanced System Health, Hardware & Security Triage Tool
 # Author         : Nabil
 # ---------------------------------------------------------------------------
@@ -65,7 +65,7 @@ fi
 root_usage=$(df -h / | tail -n 1 | awk '{print "Used: "$3" / Total: "$2" ("$5")"}')
 echo -e "Storage (/) : $root_usage [Type: $disk_type]"
 
-# 3. Dynamic Thermal Sensors (With Heuristic Fallback)
+# 3. Dynamic Thermal Sensors
 echo -e "\n${YELLOW}[*] THERMAL SENSORS & HARDWARE LIMITS${RESET}"
 
 declare -A sensor_temps
@@ -166,7 +166,7 @@ for zone in /sys/class/thermal/thermal_zone*; do
     fi
 done
 
-# C. Print Merged Data with Heuristic Standards for N/A Limits
+# C. Print Merged Data
 if [ ${#sensor_temps[@]} -eq 0 ]; then
     echo -e "  Sensors             : Thermal subsystem not detected."
 else
@@ -174,7 +174,7 @@ else
     for name in "${sorted_keys[@]}"; do
         lim="${sensor_limits[$name]:-N/A}"
         
-        # Apply Industry Standard Limits if hardware reports N/A
+        # Apply Standard Limits if hardware reports N/A
         if [ "$lim" == "N/A" ]; then
             case "${name,,}" in
                 *cpu*) lim="95°C (Est)" ;;
@@ -206,5 +206,5 @@ echo -e "\n${CYAN}[+] Top 3 CPU Consuming Processes:${RESET}"
 echo -e "$(ps -eo pid,cmd,%cpu --sort=-%cpu | head -n 5 | grep -v "ps -eo" | head -n 4)"
 
 echo -e "\n${CYAN}======================================================${RESET}"
-echo -e "${GREEN}Triage Complete. (Heuristic Standards Applied)${RESET}"
+echo -e "${GREEN}Triage Complete.${RESET}"
 echo -e "${CYAN}======================================================${RESET}"
