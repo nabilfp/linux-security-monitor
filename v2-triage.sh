@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # ---------------------------------------------------------------------------
-# Script Name    : v2-triage.sh (Enhanced Edition - Patch 1)
-# Description    : Advanced System Health, Hardware & Security Triage Tool
+# Script Name    : v2-triage.sh (Enhanced Edition - Patch 2)
+# Description    : Advanced System Health & Security Triage (No-Log Version)
 # Author         : Nabil
 # ---------------------------------------------------------------------------
 
@@ -13,105 +13,103 @@ RED='\033[0;31m'
 YELLOW='\033[1;33m'
 RESET='\033[0m'
 
-# Set dynamic log file location
-LOG_FILE="/tmp/security_audit_$(date +%Y%m%d_%H%M%S).log"
-REPORT_DATA=""
-
-# Function to handle both terminal output and plain text logging
-log_and_print() {
-    echo -e "$1"
-    clean_text=$(echo -e "$1" | sed -r "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g")
-    REPORT_DATA+="$clean_text\n"
-}
-
 # ---------------------------------------------------------------------------
 # EXECUTION START
 # ---------------------------------------------------------------------------
 
+# Clear the terminal screen for a clean, professional output
 printf '\033c'
 
-log_and_print "${CYAN}======================================================${RESET}"
-log_and_print "${GREEN}   🛡️  LINUX SECURITY & HEALTH TRIAGE (v2.0-PRO) 🛡️   ${RESET}"
-log_and_print "${CYAN}======================================================${RESET}"
+echo -e "${CYAN}======================================================${RESET}"
+echo -e "${GREEN}   🛡️  LINUX SECURITY & HEALTH TRIAGE (v2.0-PRO) 🛡️   ${RESET}"
+echo -e "${CYAN}======================================================${RESET}"
 
 # 1. System Identity & Connectivity
-log_and_print "${YELLOW}[*] SYSTEM IDENTITY${RESET}"
-log_and_print "Timestamp   : $(date)"
-log_and_print "OS Release  : $(cat /etc/os-release | grep "PRETTY_NAME" | cut -d'=' -f2 | tr -d '\"')"
-log_and_print "Kernel      : $(uname -r)"
-log_and_print "Uptime      : $(uptime -p)"
+echo -e "${YELLOW}[*] SYSTEM IDENTITY${RESET}"
+echo -e "Timestamp   : $(date)"
+echo -e "OS Release  : $(cat /etc/os-release | grep "PRETTY_NAME" | cut -d'=' -f2 | tr -d '\"')"
+echo -e "Kernel      : $(uname -r)"
+echo -e "Uptime      : $(uptime -p)"
 
+# Detect Public IP safely
 pub_ip=$(curl -s https://ifconfig.me || echo "Offline / Unreachable")
-log_and_print "Public IP   : $pub_ip"
+echo -e "Public IP   : $pub_ip"
 
 # 2. Hardware & Thermal Status
-log_and_print "\n${YELLOW}[*] HARDWARE & THERMAL STATUS${RESET}"
+echo -e "\n${YELLOW}[*] HARDWARE & THERMAL STATUS${RESET}"
 
 # Battery Health
 if [ -d /sys/class/power_supply/BAT0 ]; then
     bat_status=$(cat /sys/class/power_supply/BAT0/status 2>/dev/null)
     bat_cap=$(cat /sys/class/power_supply/BAT0/capacity 2>/dev/null)
-    log_and_print "Battery     : ${bat_cap}% (${bat_status})"
+    echo -e "Battery     : ${bat_cap}% (${bat_status})"
 elif [ -d /sys/class/power_supply/BAT1 ]; then
     bat_status=$(cat /sys/class/power_supply/BAT1/status 2>/dev/null)
     bat_cap=$(cat /sys/class/power_supply/BAT1/capacity 2>/dev/null)
-    log_and_print "Battery     : ${bat_cap}% (${bat_status})"
+    echo -e "Battery     : ${bat_cap}% (${bat_status})"
 else
-    log_and_print "Battery     : Not present (Desktop / VM)"
+    echo -e "Battery     : Not present (Desktop / VM)"
 fi
 
-# CPU Temperature
+# CPU Temperature and Critical Limits
 if [ -f /sys/class/thermal/thermal_zone0/temp ]; then
     temp_c=$(( $(cat /sys/class/thermal/thermal_zone0/temp) / 1000 ))
     if [ -f /sys/class/thermal/thermal_zone0/trip_point_0_temp ]; then
         trip_c=$(( $(cat /sys/class/thermal/thermal_zone0/trip_point_0_temp) / 1000 ))
-        log_and_print "CPU Temp    : ${temp_c}°C (Critical Limit: ${trip_c}°C)"
+        echo -e "CPU Temp    : ${temp_c}°C (Critical Limit: ${trip_c}°C)"
     else
-        log_and_print "CPU Temp    : ${temp_c}°C"
+        echo -e "CPU Temp    : ${temp_c}°C"
     fi
 else
-    log_and_print "CPU Temp    : Sensor not found"
+    echo -e "CPU Temp    : Sensor not found"
 fi
 
-# RAM and Swap
+# RAM and Swap Allocation
 mem_info=$(free -h | awk 'NR==2{printf "Used: %s / Total: %s (%.2f%%)", $3,$2,$3*100/$2 }')
 swap_info=$(free -h | awk 'NR==3{printf "Used: %s / Total: %s", $3,$2 }')
-log_and_print "RAM Memory  : $mem_info"
-log_and_print "Swap Memory : $swap_info"
+echo -e "RAM Memory  : $mem_info"
+echo -e "Swap Memory : $swap_info"
 
-# SSD/HDD Storage Detection (BUG FIXED)
-# Gets the exact partition mounted at root (/), ignoring Snap loop devices
-root_part=$(df / | tail -1 | awk '{print $1}')
-rota_check=$(lsblk -n -o ROTA "$root_part" 2>/dev/null | head -n 1)
+# Advanced SSD/HDD Detection (Bypassing Virtual/LVM loops)
+# Directly hunts for the primary physical drive name
+main_drive=$(lsblk -d -n -o NAME | grep -E "^(sd|nvme)" | head -1)
 
-if [ "$rota_check" == "0" ]; then 
-    disk_type="SSD/NVMe"
-elif [ "$rota_check" == "1" ]; then
-    disk_type="HDD"
-else 
-    disk_type="Unknown"
+if [[ "$main_drive" == *"nvme"* ]]; then
+    disk_type="NVMe SSD"
+else
+    # Check rotational status directly from the kernel
+    rota_check=$(cat /sys/block/"$main_drive"/queue/rotational 2>/dev/null)
+    if [ "$rota_check" == "0" ]; then 
+        disk_type="SATA SSD"
+    elif [ "$rota_check" == "1" ]; then
+        disk_type="HDD"
+    else 
+        disk_type="Unknown"
+    fi
 fi
 
 root_usage=$(df -h / | tail -n 1 | awk '{print "Used: "$3" / Total: "$2" ("$5")"}')
-log_and_print "Storage (/) : $root_usage [Type: $disk_type]"
+echo -e "Storage (/) : $root_usage [Type: $disk_type]"
 
 # 3. Security Analysis (SOC Focus)
-log_and_print "\n${YELLOW}[*] SECURITY & THREAT ANALYSIS${RESET}"
+echo -e "\n${YELLOW}[*] SECURITY & THREAT ANALYSIS${RESET}"
 
+# Failed SSH Logins
 failed_logins=$(journalctl _SYSTEMD_UNIT=ssh.service 2>/dev/null | grep "Failed password" | wc -l || echo "N/A")
-log_and_print "Failed SSH Logins : $failed_logins"
+echo -e "Failed SSH Logins : $failed_logins"
 
-log_and_print "\n${CYAN}[+] Active User Sessions:${RESET}"
-log_and_print "$(who)"
+# Active Sessions
+echo -e "\n${CYAN}[+] Active User Sessions:${RESET}"
+echo -e "$(who)"
 
-log_and_print "\n${CYAN}[+] Active Listening Ports:${RESET}"
-log_and_print "$(ss -tuln | awk 'NR>1 {print $1, $5}' | head -n 5)"
+# Mapping listening ports
+echo -e "\n${CYAN}[+] Active Listening Ports:${RESET}"
+echo -e "$(ss -tuln | awk 'NR>1 {print $1, $5}' | head -n 5)"
 
-log_and_print "\n${CYAN}[+] Top 3 CPU Consuming Processes:${RESET}"
-log_and_print "$(ps -eo pid,cmd,%cpu --sort=-%cpu | head -n 4)"
+# Resource Hogs
+echo -e "\n${CYAN}[+] Top 3 CPU Consuming Processes:${RESET}"
+echo -e "$(ps -eo pid,cmd,%cpu --sort=-%cpu | head -n 4)"
 
-log_and_print "\n${CYAN}======================================================${RESET}"
-log_and_print "${GREEN}Triage Complete. Audit log saved to: $LOG_FILE${RESET}"
-log_and_print "${CYAN}======================================================${RESET}"
-
-echo -e "$REPORT_DATA" > "$LOG_FILE"
+echo -e "\n${CYAN}======================================================${RESET}"
+echo -e "${GREEN}Triage Complete.${RESET}"
+echo -e "${CYAN}======================================================${RESET}"
