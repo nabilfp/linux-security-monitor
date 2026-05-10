@@ -13,13 +13,13 @@ This project was born out of the necessity for a fast, reliable, and dependency-
 The recommended version. It performs a deeper security check (active users, top CPU consumers to hunt anomalies) and safely generates a clean `.log` file in your `/tmp/` directory without cluttering your workspace.
 
 ```bash
-curl -sL https://raw.githubusercontent.com/nabilfp/linux-security-monitor/main/v2-triage.sh](https://raw.githubusercontent.com/nabilfp/linux-security-monitor/main/v2-triage.sh | bash
+curl -sL https://raw.githubusercontent.com/nabilfp/linux-security-monitor/main/v2-triage.sh | bash
 ```
 
 ### Version 1.0 (Basic Health Check)
 The legacy version for a quick, terminal-only visual check.
 ```bash
-curl -sL https://raw.githubusercontent.com/nabilfp/linux-security-monitor/main/sys-monitor.sh](https://raw.githubusercontent.com/nabilfp/linux-security-monitor/main/sys-monitor.sh | bash
+curl -sL https://raw.githubusercontent.com/nabilfp/linux-security-monitor/main/sys-monitor.sh | bash
 ```
 
 ---
