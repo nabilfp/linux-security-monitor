@@ -24,11 +24,13 @@ curl -sL https://raw.githubusercontent.com/nabilfp/linux-security-monitor/main/s
 
 ---
 
-## 🛠️ Features inside v2.0
-1. **Dynamic Log Generation:** Uses regex via `sed` to strip ANSI color codes, saving a clean, professional text report into `/tmp/`.
-2. **Threat Hunting Basics:** Identifies top CPU-consuming processes, which is crucial for spotting stealthy crypto-miners or runaway scripts.
-3. **Session Monitoring:** Lists currently logged-in users to detect unauthorized access.
-4. **Network Surface Check:** Uses `ss` to map active TCP/UDP listening ports.
+## 🛠️ Features inside v2.0 (Enhanced)
+1. **System Identity:** Detailed OS version, Kernel info, and Uptime.
+2. **Connectivity Audit:** Instant Public IP detection to map your network perimeter.
+3. **Thermal Monitoring:** Native CPU temperature check without external dependencies.
+4. **Security Triage:** - Failed login attempt counter (via systemd journal).
+    - Top process monitoring to detect suspicious resource spikes.
+    - Active session and open port mapping.
 
 ## ⚠️ Weaknesses & Limitations
 - **No Root Required, But...:** This script is designed to run safely without `sudo`. However, some process details might be hidden by the Linux kernel unless executed by a root user.
