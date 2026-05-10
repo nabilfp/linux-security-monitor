@@ -43,10 +43,20 @@ The execution is nearly instantaneous (usually under 2 seconds). If it hangs due
 ---
 
 ## 🗺️ Future Roadmap
-Continuous improvement is key. Here are the planned updates for upcoming releases:
-- [ ] **v2.1 (Interactive Mode):** Implement a simple interactive menu so users can choose to run specific checks (e.g., Network Only, Hardware Only).
-- [ ] **v3.0 (Automation):** Add an installation script to automatically set up a Linux `cronjob` for daily background security auditing.
-- [ ] **v3.1 (Baseline Comparison):** Introduce a mechanism to compare current open ports with a saved baseline to automatically flag *new* suspicious ports.
+Continuous improvement (Kaizen) is key. Here is the planned evolution of this project, moving from a basic triage script to an Enterprise-ready SOC tool:
+
+### Phase 1: Usability & Baselining
+- [ ] **v2.1 (Interactive Mode):** Implement a simple interactive CLI menu so users can choose to run specific targeted checks (e.g., Network Only, Hardware Only, or Full Audit).
+- [ ] **v2.2 (Network Baselining):** Introduce a mechanism to compare current open ports with a saved baseline to automatically flag *new* suspicious ports or potential reverse shells.
+
+### Phase 2: Automation & Threat Hunting
+- [ ] **v3.0 (Automation / SOAR):** Add an installation script to automatically set up a Linux `cronjob` for daily, hands-free background security auditing.
+- [ ] **v3.1 (Proactive Threat Hunting):** Implement lightweight FIM (File Integrity Monitoring) using `sha256sum` to detect unauthorized modifications to critical system files (e.g., `/etc/passwd`, `/etc/shadow`).
+- [ ] **v3.2 (Forensic Extraction):** Add capabilities to scan temporary directories (like `/tmp/`) for disguised malware by reading *magic bytes* instead of relying on file extensions.
+
+### Phase 3: Enterprise Integration
+- [ ] **v4.0 (Enterprise SIEM Ready):** Convert the plain-text audit logs into structured JSON payloads. This allows the tool's output to be easily ingested by modern SIEM platforms like Wazuh, Splunk, or Elastic Security.
+- [ ] **v4.1 (CIS Auditing):** Automate server configuration checks against the Center for Internet Security (CIS) benchmarks (e.g., ensuring strict SSH hardening).rts.
 
 ---
 **Maintained by:** [Nabil](https://github.com/nabilfp)
