@@ -41,7 +41,7 @@ load_avg=$(uptime | awk -F'load average:' '{ print $2 }' | xargs)
 log_and_print "Load Average   : $load_avg"
 
 # System Uptime
-echo -e "\n${GREEN}[+] System Uptime:${NC}"
+echo -e "\n[+] System Uptime:${NC}"
 uptime -p
 
 # Memory Allocation
