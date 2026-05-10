@@ -2,7 +2,7 @@
 
 # ---------------------------------------------------------------------------
 # Script Name    : v2-triage.sh (Enhanced Edition)
-# Description    : Advanced System Health & Security Triage Tool
+# Description    : Advanced System Health, Hardware & Security Triage Tool
 # Author         : Nabil
 # ---------------------------------------------------------------------------
 
@@ -20,7 +20,7 @@ REPORT_DATA=""
 # Function to handle both terminal output and plain text logging
 log_and_print() {
     echo -e "$1"
-    # Strip ANSI color codes to keep the log file clean
+    # Strip ANSI color codes to keep the log file clean using regex
     clean_text=$(echo -e "$1" | sed -r "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g")
     REPORT_DATA+="$clean_text\n"
 }
@@ -47,20 +47,48 @@ log_and_print "Uptime      : $(uptime -p)"
 pub_ip=$(curl -s https://ifconfig.me || echo "Offline / Unreachable")
 log_and_print "Public IP   : $pub_ip"
 
-# 2. Hardware & Thermal Status
+# 2. Hardware & Thermal Status (Enhanced)
 log_and_print "\n${YELLOW}[*] HARDWARE & THERMAL STATUS${RESET}"
 
-# CPU Temperature (Native reading without external packages)
+# Battery Health (Checking standard BAT0 or BAT1 interfaces)
+if [ -d /sys/class/power_supply/BAT0 ]; then
+    bat_status=$(cat /sys/class/power_supply/BAT0/status 2>/dev/null)
+    bat_cap=$(cat /sys/class/power_supply/BAT0/capacity 2>/dev/null)
+    log_and_print "Battery     : ${bat_cap}% (${bat_status})"
+elif [ -d /sys/class/power_supply/BAT1 ]; then
+    bat_status=$(cat /sys/class/power_supply/BAT1/status 2>/dev/null)
+    bat_cap=$(cat /sys/class/power_supply/BAT1/capacity 2>/dev/null)
+    log_and_print "Battery     : ${bat_cap}% (${bat_status})"
+else
+    log_and_print "Battery     : Not present (Desktop / VM)"
+fi
+
+# CPU Temperature and Native Critical Thresholds
 if [ -f /sys/class/thermal/thermal_zone0/temp ]; then
     temp_c=$(( $(cat /sys/class/thermal/thermal_zone0/temp) / 1000 ))
-    log_and_print "CPU Temp    : ${temp_c}°C"
+    # Attempt to read the hardware's programmed critical trip point
+    if [ -f /sys/class/thermal/thermal_zone0/trip_point_0_temp ]; then
+        trip_c=$(( $(cat /sys/class/thermal/thermal_zone0/trip_point_0_temp) / 1000 ))
+        log_and_print "CPU Temp    : ${temp_c}°C (Critical Limit: ${trip_c}°C)"
+    else
+        log_and_print "CPU Temp    : ${temp_c}°C"
+    fi
 else
     log_and_print "CPU Temp    : Sensor not found"
 fi
 
-# Resource Allocation
+# Detailed RAM and Swap Allocation
 mem_info=$(free -h | awk 'NR==2{printf "Used: %s / Total: %s (%.2f%%)", $3,$2,$3*100/$2 }')
-log_and_print "Memory      : $mem_info"
+swap_info=$(free -h | awk 'NR==3{printf "Used: %s / Total: %s", $3,$2 }')
+log_and_print "RAM Memory  : $mem_info"
+log_and_print "Swap Memory : $swap_info"
+
+# SSD/HDD Storage Detection and Usage
+# lsblk checks if the drive is rotational (1 = HDD) or solid state (0 = SSD/NVMe)
+rota_check=$(lsblk -d -o ROTA | awk 'NR==2')
+if [ "$rota_check" == "0" ]; then disk_type="SSD/NVMe"; else disk_type="HDD"; fi
+root_usage=$(df -h / | tail -n 1 | awk '{print "Used: "$3" / Total: "$2" ("$5")"}')
+log_and_print "Storage (/) : $root_usage [Type: $disk_type]"
 
 # 3. Security Analysis (SOC Focus)
 log_and_print "\n${YELLOW}[*] SECURITY & THREAT ANALYSIS${RESET}"
