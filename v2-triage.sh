@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ---------------------------------------------------------------------------
-# Script Name    : v2-triage.sh (Enhanced Edition)
+# Script Name    : v2-triage.sh (Enhanced Edition - Patch 1)
 # Description    : Advanced System Health, Hardware & Security Triage Tool
 # Author         : Nabil
 # ---------------------------------------------------------------------------
@@ -20,7 +20,6 @@ REPORT_DATA=""
 # Function to handle both terminal output and plain text logging
 log_and_print() {
     echo -e "$1"
-    # Strip ANSI color codes to keep the log file clean using regex
     clean_text=$(echo -e "$1" | sed -r "s/\x1B\[([0-9]{1,3}(;[0-9]{1,2})?)?[mGK]//g")
     REPORT_DATA+="$clean_text\n"
 }
@@ -29,7 +28,6 @@ log_and_print() {
 # EXECUTION START
 # ---------------------------------------------------------------------------
 
-# Clear the terminal screen for better readability before showing the report
 printf '\033c'
 
 log_and_print "${CYAN}======================================================${RESET}"
@@ -43,14 +41,13 @@ log_and_print "OS Release  : $(cat /etc/os-release | grep "PRETTY_NAME" | cut -d
 log_and_print "Kernel      : $(uname -r)"
 log_and_print "Uptime      : $(uptime -p)"
 
-# Detect Public IP safely
 pub_ip=$(curl -s https://ifconfig.me || echo "Offline / Unreachable")
 log_and_print "Public IP   : $pub_ip"
 
-# 2. Hardware & Thermal Status (Enhanced)
+# 2. Hardware & Thermal Status
 log_and_print "\n${YELLOW}[*] HARDWARE & THERMAL STATUS${RESET}"
 
-# Battery Health (Checking standard BAT0 or BAT1 interfaces)
+# Battery Health
 if [ -d /sys/class/power_supply/BAT0 ]; then
     bat_status=$(cat /sys/class/power_supply/BAT0/status 2>/dev/null)
     bat_cap=$(cat /sys/class/power_supply/BAT0/capacity 2>/dev/null)
@@ -63,10 +60,9 @@ else
     log_and_print "Battery     : Not present (Desktop / VM)"
 fi
 
-# CPU Temperature and Native Critical Thresholds
+# CPU Temperature
 if [ -f /sys/class/thermal/thermal_zone0/temp ]; then
     temp_c=$(( $(cat /sys/class/thermal/thermal_zone0/temp) / 1000 ))
-    # Attempt to read the hardware's programmed critical trip point
     if [ -f /sys/class/thermal/thermal_zone0/trip_point_0_temp ]; then
         trip_c=$(( $(cat /sys/class/thermal/thermal_zone0/trip_point_0_temp) / 1000 ))
         log_and_print "CPU Temp    : ${temp_c}°C (Critical Limit: ${trip_c}°C)"
@@ -77,35 +73,40 @@ else
     log_and_print "CPU Temp    : Sensor not found"
 fi
 
-# Detailed RAM and Swap Allocation
+# RAM and Swap
 mem_info=$(free -h | awk 'NR==2{printf "Used: %s / Total: %s (%.2f%%)", $3,$2,$3*100/$2 }')
 swap_info=$(free -h | awk 'NR==3{printf "Used: %s / Total: %s", $3,$2 }')
 log_and_print "RAM Memory  : $mem_info"
 log_and_print "Swap Memory : $swap_info"
 
-# SSD/HDD Storage Detection and Usage
-# lsblk checks if the drive is rotational (1 = HDD) or solid state (0 = SSD/NVMe)
-rota_check=$(lsblk -d -o ROTA | awk 'NR==2')
-if [ "$rota_check" == "0" ]; then disk_type="SSD/NVMe"; else disk_type="HDD"; fi
+# SSD/HDD Storage Detection (BUG FIXED)
+# Gets the exact partition mounted at root (/), ignoring Snap loop devices
+root_part=$(df / | tail -1 | awk '{print $1}')
+rota_check=$(lsblk -n -o ROTA "$root_part" 2>/dev/null | head -n 1)
+
+if [ "$rota_check" == "0" ]; then 
+    disk_type="SSD/NVMe"
+elif [ "$rota_check" == "1" ]; then
+    disk_type="HDD"
+else 
+    disk_type="Unknown"
+fi
+
 root_usage=$(df -h / | tail -n 1 | awk '{print "Used: "$3" / Total: "$2" ("$5")"}')
 log_and_print "Storage (/) : $root_usage [Type: $disk_type]"
 
 # 3. Security Analysis (SOC Focus)
 log_and_print "\n${YELLOW}[*] SECURITY & THREAT ANALYSIS${RESET}"
 
-# Check for Failed Login Attempts (Hunting for brute-force attacks)
 failed_logins=$(journalctl _SYSTEMD_UNIT=ssh.service 2>/dev/null | grep "Failed password" | wc -l || echo "N/A")
 log_and_print "Failed SSH Logins : $failed_logins"
 
-# Active Sessions
 log_and_print "\n${CYAN}[+] Active User Sessions:${RESET}"
 log_and_print "$(who)"
 
-# Network Surface (Mapping listening ports)
 log_and_print "\n${CYAN}[+] Active Listening Ports:${RESET}"
 log_and_print "$(ss -tuln | awk 'NR>1 {print $1, $5}' | head -n 5)"
 
-# Resource Hogs (Hunting for anomalies/miners)
 log_and_print "\n${CYAN}[+] Top 3 CPU Consuming Processes:${RESET}"
 log_and_print "$(ps -eo pid,cmd,%cpu --sort=-%cpu | head -n 4)"
 
@@ -113,5 +114,4 @@ log_and_print "\n${CYAN}======================================================${
 log_and_print "${GREEN}Triage Complete. Audit log saved to: $LOG_FILE${RESET}"
 log_and_print "${CYAN}======================================================${RESET}"
 
-# Save the clean report data to the temporary directory
 echo -e "$REPORT_DATA" > "$LOG_FILE"
