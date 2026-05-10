@@ -10,7 +10,7 @@ This project was born out of the necessity for a fast, reliable, and dependency-
 ## 🚀 Instant Usage (One-Liner)
 
 ### Version 2.0 (Advanced Triage & Auto-Logging)
-The recommended version. It performs a deeper security check (active users, top CPU consumers to hunt anomalies)
+The recommended version. It performs a deeper security check (active users, top CPU consumers to hunt anomalies) and hardware profiling without leaving any trace files on your system.
 
 ```bash
 curl -sL https://raw.githubusercontent.com/nabilfp/linux-security-monitor/main/v2-triage.sh | bash
