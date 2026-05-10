@@ -33,7 +33,6 @@ Since this script runs a sequence of commands and then finishes, it will stop au
 
 ## 📈 Future Roadmap
 - [ ] Add auto-logging to a `.log` file.
-- [ ] Add Slack/Discord notification alerts.
 - [ ] Add CPU temperature monitoring.
 
 ---
