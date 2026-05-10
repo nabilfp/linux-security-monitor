@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ---------------------------------------------------------------------------
-# Script Name    : v2-triage.sh (Universal Edition - Patch 2)
+# Script Name    : v2-triage.sh (Universal Edition - Heuristic Patch)
 # Description    : Advanced System Health, Hardware & Security Triage Tool
 # Author         : Nabil
 # ---------------------------------------------------------------------------
@@ -65,7 +65,7 @@ fi
 root_usage=$(df -h / | tail -n 1 | awk '{print "Used: "$3" / Total: "$2" ("$5")"}')
 echo -e "Storage (/) : $root_usage [Type: $disk_type]"
 
-# 3. Dynamic Thermal Sensors (With Logic Sanity Check)
+# 3. Dynamic Thermal Sensors (With Heuristic Fallback)
 echo -e "\n${YELLOW}[*] THERMAL SENSORS & HARDWARE LIMITS${RESET}"
 
 declare -A sensor_temps
@@ -82,10 +82,10 @@ for hwmon_dir in /sys/class/hwmon/hwmon*; do
         [ -z "$temp_raw" ] || [ "$temp_raw" -le 0 ] && continue
         
         temp_c=$((temp_raw / 1000))
-        
         label_file="${input_file%_input}_label"
         label=$(cat "$label_file" 2>/dev/null)
         
+        # Friendly Names
         if [[ "${hwmon_name,,}" == *"k10temp"* ]]; then human_name="AMD Ryzen CPU"
         elif [[ "${hwmon_name,,}" == *"amdgpu"* ]]; then human_name="AMD Radeon GPU"
         elif [[ "${hwmon_name,,}" == "coretemp" ]]; then 
@@ -103,21 +103,24 @@ for hwmon_dir in /sys/class/hwmon/hwmon*; do
             [ -n "$label" ] && human_name="$hwmon_name ($label)"
         fi
         
-        # Limit Sanity Check (Filters out > 200°C dummy values)
+        # Strict Sanity Check for hardware limits using Regex
         crit_file="${input_file%_input}_crit"
         max_file="${input_file%_input}_max"
         limit="N/A"
+        
         if [ -f "$crit_file" ]; then
             limit_raw=$(cat "$crit_file" 2>/dev/null)
-            if [ -n "$limit_raw" ]; then
+            if [[ "$limit_raw" =~ ^[0-9]+$ ]]; then
                 lim_c=$((limit_raw / 1000))
-                [ "$lim_c" -lt 200 ] && limit="${lim_c}°C"
+                [ "$lim_c" -lt 150 ] && limit="${lim_c}°C"
             fi
-        elif [ -f "$max_file" ]; then
+        fi
+        
+        if [ "$limit" == "N/A" ] && [ -f "$max_file" ]; then
             limit_raw=$(cat "$max_file" 2>/dev/null)
-            if [ -n "$limit_raw" ]; then
+            if [[ "$limit_raw" =~ ^[0-9]+$ ]]; then
                 lim_c=$((limit_raw / 1000))
-                [ "$lim_c" -lt 200 ] && limit="${lim_c}°C (Max)"
+                [ "$lim_c" -lt 150 ] && limit="${lim_c}°C (Max)"
             fi
         fi
         
@@ -149,9 +152,9 @@ for zone in /sys/class/thermal/thermal_zone*; do
         if [ "$(cat "$trip_type_file" 2>/dev/null)" == "critical" ]; then
             trip_temp_file="${trip_type_file%_type}_temp"
             limit_raw=$(cat "$trip_temp_file" 2>/dev/null)
-            if [ -n "$limit_raw" ]; then
+            if [[ "$limit_raw" =~ ^[0-9]+$ ]]; then
                 lim_c=$((limit_raw / 1000))
-                [ "$lim_c" -lt 200 ] && limit="${lim_c}°C"
+                [ "$lim_c" -lt 150 ] && limit="${lim_c}°C"
             fi
             break
         fi
@@ -163,13 +166,26 @@ for zone in /sys/class/thermal/thermal_zone*; do
     fi
 done
 
-# Print Merged Data
+# C. Print Merged Data with Heuristic Standards for N/A Limits
 if [ ${#sensor_temps[@]} -eq 0 ]; then
     echo -e "  Sensors             : Thermal subsystem not detected."
 else
     mapfile -t sorted_keys < <(IFS=$'\n'; sort -f <<<"${!sensor_temps[*]}")
     for name in "${sorted_keys[@]}"; do
         lim="${sensor_limits[$name]:-N/A}"
+        
+        # Apply Industry Standard Limits if hardware reports N/A
+        if [ "$lim" == "N/A" ]; then
+            case "${name,,}" in
+                *cpu*) lim="95°C (Est)" ;;
+                *gpu*) lim="90°C (Est)" ;;
+                *nvme*|*ssd*) lim="70°C (Est)" ;;
+                *wi-fi*|*wifi*) lim="80°C (Est)" ;;
+                *motherboard*|*mainboard*|*acpi*) lim="85°C (Est)" ;;
+                *) lim="80°C (Est)" ;;
+            esac
+        fi
+        
         printf "  %-20s : %-6s (Limit: %s)\n" "$name" "${sensor_temps[$name]}" "$lim"
     done
 fi
@@ -186,10 +202,9 @@ echo -e "$(who)"
 echo -e "\n${CYAN}[+] Active Listening Ports:${RESET}"
 echo -e "$(ss -tuln | awk 'NR>1 {print $1, $5}' | head -n 5)"
 
-# Resource Hogs (With Observer Effect Filter)
 echo -e "\n${CYAN}[+] Top 3 CPU Consuming Processes:${RESET}"
 echo -e "$(ps -eo pid,cmd,%cpu --sort=-%cpu | head -n 5 | grep -v "ps -eo" | head -n 4)"
 
 echo -e "\n${CYAN}======================================================${RESET}"
-echo -e "${GREEN}Triage Complete. (Cross-Platform Edition)${RESET}"
+echo -e "${GREEN}Triage Complete. (Heuristic Standards Applied)${RESET}"
 echo -e "${CYAN}======================================================${RESET}"
