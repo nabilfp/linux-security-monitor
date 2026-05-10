@@ -10,7 +10,7 @@ This project was born out of the necessity for a fast, reliable, and dependency-
 ## 🚀 Instant Usage (One-Liner)
 
 ### Version 2.0 (Advanced Triage & Auto-Logging)
-The recommended version. It performs a deeper security check (active users, top CPU consumers to hunt anomalies) and safely generates a clean `.log` file in your `/tmp/` directory without cluttering your workspace.
+The recommended version. It performs a deeper security check (active users, top CPU consumers to hunt anomalies)
 
 ```bash
 curl -sL https://raw.githubusercontent.com/nabilfp/linux-security-monitor/main/v2-triage.sh | bash
@@ -27,8 +27,11 @@ curl -sL https://raw.githubusercontent.com/nabilfp/linux-security-monitor/main/s
 ## 🛠️ Features inside v2.0 (Enhanced)
 1. **System Identity:** Detailed OS version, Kernel info, and Uptime.
 2. **Connectivity Audit:** Instant Public IP detection to map your network perimeter.
-3. **Thermal Monitoring:** Native CPU temperature check without external dependencies.
-4. **Security Triage:** - Failed login attempt counter (via systemd journal).
+3. **Advanced Hardware Telemetry:** - **Battery Health:** Detects battery capacity and charging status natively.
+    - **Thermal Limits:** Reads CPU temperature alongside the hardware's programmed critical thermal threshold.
+    - **Memory Deep-Dive:** Displays both RAM and Swap memory utilization.
+    - **Storage Recognition:** Automatically distinguishes between SSD/NVMe and HDD, alongside root partition usage.
+4. **Security Triage:** - Failed login attempt counter (hunting brute-force via systemd journal).
     - Top process monitoring to detect suspicious resource spikes.
     - Active session and open port mapping.
 
