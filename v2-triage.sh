@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ---------------------------------------------------------------------------
-# Script Name    : v2-triage.sh (Ultimate Sensor Patch)
+# Script Name    : v2-triage.sh (Universal Edition)
 # Description    : Advanced System Health, Hardware & Security Triage Tool
 # Author         : Nabil
 # ---------------------------------------------------------------------------
@@ -65,58 +65,59 @@ fi
 root_usage=$(df -h / | tail -n 1 | awk '{print "Used: "$3" / Total: "$2" ("$5")"}')
 echo -e "Storage (/) : $root_usage [Type: $disk_type]"
 
-# 3. Dynamic Thermal Sensors (Sapu Jagat Mode)
+# 3. Dynamic Thermal Sensors (Cross-Platform Merging Mode)
 echo -e "\n${YELLOW}[*] THERMAL SENSORS & HARDWARE LIMITS${RESET}"
 
-declare -A seen_sensors
-final_thermal_output=""
+declare -A sensor_temps
+declare -A sensor_limits
 
-# A. Scan HWMON (Hardware Monitors) - Extract everything!
+# A. Scan HWMON
 for hwmon_dir in /sys/class/hwmon/hwmon*; do
     [ ! -e "$hwmon_dir" ] && continue
     hwmon_name=$(cat "$hwmon_dir/name" 2>/dev/null)
     
     for input_file in "$hwmon_dir"/temp*_input; do
         [ ! -e "$input_file" ] && continue
-        
         temp_raw=$(cat "$input_file" 2>/dev/null)
-        [ -z "$temp_raw" ] && continue
-        [ "$temp_raw" -le 0 ] && continue
+        [ -z "$temp_raw" ] || [ "$temp_raw" -le 0 ] && continue
+        
         temp_c=$((temp_raw / 1000))
         
-        # Get sensor label if it exists
+        # Cross-Platform Human-Readable Translation
         label_file="${input_file%_input}_label"
         label=$(cat "$label_file" 2>/dev/null)
         
-        # Translate to Human-Readable Names
-        human_name="$hwmon_name"
-        [ -n "$label" ] && human_name="$hwmon_name ($label)"
-        
-        if [[ "${hwmon_name,,}" == "coretemp" ]]; then
-            if [[ "${label,,}" == *"package"* ]]; then human_name="CPU Package"
-            elif [[ "${label,,}" == *"core"* ]]; then human_name="CPU $label"
-            else human_name="CPU Core"
+        if [[ "${hwmon_name,,}" == *"k10temp"* ]]; then human_name="AMD Ryzen CPU"
+        elif [[ "${hwmon_name,,}" == *"amdgpu"* ]]; then human_name="AMD Radeon GPU"
+        elif [[ "${hwmon_name,,}" == "coretemp" ]]; then 
+            if [[ "${label,,}" == *"package"* ]]; then human_name="Intel CPU Package"
+            elif [[ "${label,,}" == *"core"* ]]; then human_name="Intel ${label}"
+            else human_name="Intel CPU"
             fi
+        elif [[ "${hwmon_name,,}" == *"mt7921"* || "${hwmon_name,,}" == *"mt7922"* ]]; then human_name="MediaTek Wi-Fi"
+        elif [[ "${hwmon_name,,}" == *"iwlwifi"* ]]; then human_name="Intel Wi-Fi"
         elif [[ "${hwmon_name,,}" == *"nvme"* ]]; then human_name="NVMe SSD"
-        elif [[ "${hwmon_name,,}" == *"iwlwifi"* || "${hwmon_name,,}" == *"wifi"* ]]; then human_name="WiFi Module"
         elif [[ "${hwmon_name,,}" == *"acpitz"* ]]; then human_name="Motherboard (ACPI)"
         elif [[ "${hwmon_name,,}" == *"thinkpad"* ]]; then human_name="ThinkPad Mainboard"
+        else 
+            human_name="$hwmon_name"
+            [ -n "$label" ] && human_name="$hwmon_name ($label)"
         fi
         
-        # Find Critical Limit in hwmon
+        # Seek Critical or Max Limit safely
         crit_file="${input_file%_input}_crit"
+        max_file="${input_file%_input}_max"
         limit="N/A"
         if [ -f "$crit_file" ]; then
             limit_raw=$(cat "$crit_file" 2>/dev/null)
             [ -n "$limit_raw" ] && limit="$((limit_raw / 1000))°C"
+        elif [ -f "$max_file" ]; then
+            limit_raw=$(cat "$max_file" 2>/dev/null)
+            [ -n "$limit_raw" ] && limit="$((limit_raw / 1000))°C (Max)"
         fi
         
-        # Prevent duplicates and format beautifully
-        if [ -z "${seen_sensors[$human_name]}" ]; then
-            seen_sensors["$human_name"]=1
-            printf -v formatted_line "  %-20s : %-6s (Critical Limit: %s)\n" "$human_name" "${temp_c}°C" "$limit"
-            final_thermal_output+="$formatted_line"
-        fi
+        sensor_temps["$human_name"]="${temp_c}°C"
+        [ "$limit" != "N/A" ] && sensor_limits["$human_name"]="$limit"
     done
 done
 
@@ -126,15 +127,15 @@ for zone in /sys/class/thermal/thermal_zone*; do
     sensor_type=$(cat "$zone/type" 2>/dev/null)
     temp_raw=$(cat "$zone/temp" 2>/dev/null)
     
-    [ -z "$temp_raw" ] || [ -z "$sensor_type" ] && continue
-    [ "$temp_raw" -le 0 ] && continue
+    [ -z "$temp_raw" ] || [ -z "$sensor_type" ] || [ "$temp_raw" -le 0 ] && continue
     temp_c=$((temp_raw / 1000))
     
-    human_name="$sensor_type"
     if [[ "${sensor_type,,}" == *"acpitz"* ]]; then human_name="Motherboard (ACPI)"
-    elif [[ "${sensor_type,,}" == *"x86_pkg_temp"* ]]; then human_name="CPU Package"
-    elif [[ "${sensor_type,,}" == *"iwlwifi"* ]]; then human_name="WiFi Module"
+    elif [[ "${sensor_type,,}" == *"x86_pkg_temp"* ]]; then human_name="Intel CPU Package"
+    elif [[ "${sensor_type,,}" == *"iwlwifi"* ]]; then human_name="Intel Wi-Fi"
+    elif [[ "${sensor_type,,}" == *"mt7921"* ]]; then human_name="MediaTek Wi-Fi"
     elif [[ "${sensor_type,,}" == *"nvme"* ]]; then human_name="NVMe SSD"
+    else human_name="$sensor_type"
     fi
     
     limit="N/A"
@@ -148,18 +149,22 @@ for zone in /sys/class/thermal/thermal_zone*; do
         fi
     done
     
-    if [ -z "${seen_sensors[$human_name]}" ]; then
-        seen_sensors["$human_name"]=1
-        printf -v formatted_line "  %-20s : %-6s (Critical Limit: %s)\n" "$human_name" "${temp_c}°C" "$limit"
-        final_thermal_output+="$formatted_line"
+    # Merge only if it doesn't overwrite a more detailed hwmon reading
+    if [ -z "${sensor_temps[$human_name]}" ]; then
+        sensor_temps["$human_name"]="${temp_c}°C"
+        [ "$limit" != "N/A" ] && sensor_limits["$human_name"]="$limit"
     fi
 done
 
-if [ -z "$final_thermal_output" ]; then
+# Print Merged Data
+if [ ${#sensor_temps[@]} -eq 0 ]; then
     echo -e "  Sensors             : Thermal subsystem not detected."
 else
-    # Outputting without extra newlines
-    echo -n "$final_thermal_output"
+    mapfile -t sorted_keys < <(IFS=$'\n'; sort -f <<<"${!sensor_temps[*]}")
+    for name in "${sorted_keys[@]}"; do
+        lim="${sensor_limits[$name]:-N/A}"
+        printf "  %-20s : %-6s (Limit: %s)\n" "$name" "${sensor_temps[$name]}" "$lim"
+    done
 fi
 
 # 4. Security Analysis (SOC Focus)
@@ -178,5 +183,5 @@ echo -e "\n${CYAN}[+] Top 3 CPU Consuming Processes:${RESET}"
 echo -e "$(ps -eo pid,cmd,%cpu --sort=-%cpu | head -n 4)"
 
 echo -e "\n${CYAN}======================================================${RESET}"
-echo -e "${GREEN}Triage Complete. (No trace logs left on system)${RESET}"
+echo -e "${GREEN}Triage Complete. (Cross-Platform Edition)${RESET}"
 echo -e "${CYAN}======================================================${RESET}"
