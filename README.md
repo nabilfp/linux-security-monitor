@@ -1,55 +1,66 @@
-# 🛡️ Linux Security Monitor
+# 🛡️ Linux Security Monitor (Interactive Edition)
 
-A professional, lightweight Bash-based tool designed to provide an instant overview of system health, resource allocation, and basic security triage. Built specifically for Linux environments (Ubuntu, Arch, Debian).
+> A sleek, dependency-free Bash utility built for instant system health checks, hardware telemetry, and security triage. Now with 100% more interactive menus.
 
 ---
 
-## 📖 Background & Motivation
-This project was born out of the necessity for a fast, reliable, and dependency-free triage tool. As an Information Systems student exploring the defense side of cybersecurity, I needed a script that could execute instantly across different Linux servers to quickly identify performance bottlenecks and potential security attack vectors (like unauthorized active sessions or open ports).
+## 📖 The Story & Motivation
 
-## 🚀 Instant Usage (One-Liner)
+Let's be real—monitoring a Linux server or your daily-driver laptop usually goes one of two ways: you either stare at a chaotic wall of text from `top` and `ss`, or you install a massive, bloated monitoring suite that ironically eats up the very RAM it's supposed to monitor. 
 
-### Version 2.0 (Advanced Triage & Auto-Logging)
-The recommended version. It performs a deeper security check (active users, top CPU consumers to hunt anomalies) and hardware profiling without leaving any trace files on your system.
+As an Information Systems student diving deep into the Blue Team (SOC) side of cybersecurity, I wanted a third option. I needed a tool that acts like a quick "vibe check" for any Linux environment. Something you can drop into a server, run instantly without worrying about broken dependencies, and get a clean, human-readable breakdown of what's happening under the hood.
+
+**The Evolution to v2.1:**
+We started with a basic one-liner script (v1.0) and moved to a deeper, linear triage tool (v2.0). But hardcoded scripts aren't exactly flexible. For this major v2.1 update, I completely rewrote the architecture into a **Modular Bash** format. Why? Because sometimes you just want to check your hardware temps without scanning your entire network surface. 
+
+### 🎯 Core Objectives of This Project
+- **Zero Bloatware:** No `npm install`, no Python virtual environments required. Just pure, native Bash.
+- **Stealth & Cleanliness:** It runs, it reports, and it closes. No temporary log files cluttering your system directories anymore. Leave no trace.
+- **Aesthetic by Default:** Terminal tools don't have to be ugly. The new update includes a custom ASCII system fetch that natively pulls your OS, DE, and GTK themes without forcing you to install `neofetch` or `fastfetch`.
+
+---
+
+## 🚀 How to Install & Run (v2.1)
+
+We've moved past the `curl | bash` wild west. To use the new interactive menu properly, grab the repository to your local machine. It takes less than 10 seconds.
 
 ```bash
-curl -sL https://raw.githubusercontent.com/nabilfp/linux-security-monitor/main/v2-triage.sh | bash
-```
+# 1. Clone the repository
+git clone [https://github.com/nabilfp/linux-security-monitor.git](https://github.com/nabilfp/linux-security-monitor.git)
+cd linux-security-monitor
 
-### Version 1.0 (Basic Health Check)
-The legacy version for a quick, terminal-only visual check.
-```bash
-curl -sL https://raw.githubusercontent.com/nabilfp/linux-security-monitor/main/sys-monitor.sh | bash
+# 2. Make it executable
+chmod +x v2-triage.sh
+
+# 3. Launch the interactive menu
+./v2-triage.sh
 ```
 
 ---
 
-## 🛠️ Features inside v2.0 (Enhanced)
-1. **System Identity:** Detailed OS version, Kernel info, and Uptime.
-2. **Connectivity Audit:** Instant Public IP detection to map your network perimeter.
-3. **Advanced Hardware Telemetry:** - **Battery Health:** Detects battery capacity and charging status natively.
-    - **Thermal Limits:** Reads CPU temperature alongside the hardware's programmed critical thermal threshold.
-    - **Memory Deep-Dive:** Displays both RAM and Swap memory utilization.
-    - **Storage Recognition:** Automatically distinguishes between SSD/NVMe and HDD, alongside root partition usage.
-4. **Security Triage:** - Failed login attempt counter (hunting brute-force via systemd journal).
-    - Top process monitoring to detect suspicious resource spikes.
-    - Active session and open port mapping.
+## 🛠️ What's Inside v2.1?
 
-## ⚠️ Weaknesses & Limitations
-- **No Root Required, But...:** This script is designed to run safely without `sudo`. However, some process details might be hidden by the Linux kernel unless executed by a root user.
-- **Temporary Logs:** The audit logs are stored in `/tmp/`. This means they will be permanently deleted when you restart your computer.
-- **Basic Triage Level:** This is a diagnostic tool for quick audits, not a full-scale Intrusion Detection System (IDS).
-
-## 🛑 How to Stop
-The execution is nearly instantaneous (usually under 2 seconds). If it hangs due to a system or network error, use **`Ctrl + C`** on your keyboard to send a SIGINT (Interrupt Signal) and force close the script.
+- **Interactive CLI Menu:** Choose exactly what you want to audit (System Identity, Hardware, Security, or a Full Sweep) by just pressing a number.
+- **Native System Fetch:** A built-in Tux ASCII art that dynamically reads your OS release, Kernel, Uptime, and GNOME/GTK configurations natively via `gsettings`.
+- **Smart Thermal Heuristics:** Automatically scans `/sys/class/hwmon/` for CPU, GPU, NVMe, and Wi-Fi temps. If hardware vendors (like AMD) hide their critical limits, the script automatically applies standard SOC safety heuristics (e.g., flagging CPUs at 95°C).
+- **Anti-Observer Process Monitor:** The top CPU process tracker is now smart enough to exclude itself from the list, so you don't get false alarms during your threat hunting.
+- **Threat Triage:** Instant mapping of failed SSH logins (brute-force hunting) and open internet-facing TCP/UDP ports.
 
 ---
 
-## 🗺️ Future Roadmap
-Continuous improvement (Kaizen) is key. Here is the planned evolution of this project, moving from a basic triage script to an Enterprise-ready SOC tool:
+## ⚠️ Current Limitations
+
+- **Root Privileges:** Designed to run safely as a normal user. However, deep system logs (like certain failed SSH attempts via `journalctl`) might require `sudo` to display properly depending on your distro's permission settings.
+- **Diagnostic, not IDS:** This is an active triage tool for quick audits, not a 24/7 background Intrusion Detection System. (Though automation is coming in phase 2!)
+
+---
+
+## 🗺️ Future Roadmap (Kaizen)
+
+We are always building. Here is the blueprint for turning this script into an Enterprise-ready SOC utility:
 
 ### Phase 1: Usability & Baselining
-- [ ] **v2.1 (Interactive Mode):** Implement a simple interactive CLI menu so users can choose to run specific targeted checks (e.g., Network Only, Hardware Only, or Full Audit).
+- [x] **v2.1 (Interactive Mode):** Implement a simple interactive CLI menu so users can choose specific targeted checks.
 - [ ] **v2.2 (Network Baselining):** Introduce a mechanism to compare current open ports with a saved baseline to automatically flag *new* suspicious ports or potential reverse shells.
 
 ### Phase 2: Automation & Threat Hunting
@@ -58,8 +69,8 @@ Continuous improvement (Kaizen) is key. Here is the planned evolution of this pr
 - [ ] **v3.2 (Forensic Extraction):** Add capabilities to scan temporary directories (like `/tmp/`) for disguised malware by reading *magic bytes* instead of relying on file extensions.
 
 ### Phase 3: Enterprise Integration
-- [ ] **v4.0 (Enterprise SIEM Ready):** Convert the plain-text audit logs into structured JSON payloads. This allows the tool's output to be easily ingested by modern SIEM platforms like Wazuh, Splunk, or Elastic Security.
-- [ ] **v4.1 (CIS Auditing):** Automate server configuration checks against the Center for Internet Security (CIS) benchmarks (e.g., ensuring strict SSH hardening).rts.
+- [ ] **v4.0 (Enterprise SIEM Ready):** Convert the plain-text audit logs into structured JSON payloads for modern SIEM platforms (Wazuh, Splunk, Elastic).
+- [ ] **v4.1 (CIS Auditing):** Automate server configuration checks against the Center for Internet Security (CIS) benchmarks.
 
 ---
-**Maintained by:** [Nabil](https://github.com/nabilfp)
+**Maintained with ☕ by:** [Nabil](https://github.com/nabilfp)
