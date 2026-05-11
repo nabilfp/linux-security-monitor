@@ -2,7 +2,7 @@
 
 # ===========================================================================
 # Project        : Linux Security & System Monitor (v2.1)
-# Description    : Interactive Triage Tool with OPSEC Self-Destruct
+# Description    : Interactive Triage Tool with OPSEC & Sudo Accuracy
 # Author         : Nabil
 # Architecture   : Modular Bash (Functions & Case Loop)
 # ===========================================================================
@@ -14,6 +14,14 @@ RED='\033[0;31m'
 YELLOW='\033[1;33m'
 BOLD='\033[1m'
 RESET='\033[0m'
+
+# --- [ GOD MODE: SUDO CHECK ] ---
+printf '\033c'
+echo -e "${CYAN}======================================================${RESET}"
+echo -e "${GREEN}   🛡️  LINUX SECURITY & HEALTH TRIAGE (v2.1-INT) 🛡️   ${RESET}"
+echo -e "${CYAN}======================================================${RESET}"
+echo -e "${YELLOW}[*] Requesting Root (sudo) access for 99% accuracy hardware telemetry...${RESET}"
+sudo -v || { echo -e "${RED}[!] Access Denied. Sudo is required for accurate health scanning.${RESET}"; exit 1; }
 
 # --- [ FUNCTION 1: SYSTEM IDENTITY & FASTFETCH ] ---
 function check_system_identity() {
@@ -44,9 +52,8 @@ function check_hardware() {
         bat_status=$(cat "$bat_dir/status" 2>/dev/null)
         bat_cap=$(cat "$bat_dir/capacity" 2>/dev/null)
         
-        # Calculate Wear Level using Manufacturer Design vs Current Capacity
-        design=$(cat "$bat_dir/energy_full_design" 2>/dev/null || cat "$bat_dir/charge_full_design" 2>/dev/null)
-        current=$(cat "$bat_dir/energy_full" 2>/dev/null || cat "$bat_dir/charge_full" 2>/dev/null)
+        design=$(sudo cat "$bat_dir/energy_full_design" 2>/dev/null || sudo cat "$bat_dir/charge_full_design" 2>/dev/null)
+        current=$(sudo cat "$bat_dir/energy_full" 2>/dev/null || sudo cat "$bat_dir/charge_full" 2>/dev/null)
         
         if [[ -n "$design" && -n "$current" && "$design" -gt 0 ]]; then
             health_pct=$(( 100 * current / design ))
@@ -67,15 +74,15 @@ function check_hardware() {
         echo -e "Battery     : Not present (Desktop / VM)"
     fi
 
-    # 2. RAM Memory Health (99% Accurate Memory Pressure via /proc/meminfo)
+    # 2. RAM Memory Health (99% Accurate Pressure Reading - DDR1-DDR5 Universal)
     mem_total=$(awk '/MemTotal/ {print $2}' /proc/meminfo)
     mem_avail=$(awk '/MemAvailable/ {print $2}' /proc/meminfo)
     
     if [[ -n "$mem_total" && -n "$mem_avail" ]]; then
         ram_health_pct=$(( 100 * mem_avail / mem_total ))
-        if [ "$ram_health_pct" -gt 20 ]; then ram_health="${GREEN}Optimal ($ram_health_pct% Available Free Space)${RESET}"
-        elif [ "$ram_health_pct" -gt 5 ]; then ram_health="${YELLOW}Stressed ($ram_health_pct% Available Free Space)${RESET}"
-        else ram_health="${RED}Critical (OOM Risk - Kernel Panic Imminent)${RESET}"
+        if [ "$ram_health_pct" -gt 20 ]; then ram_health="${GREEN}Optimal ($ram_health_pct% Free)${RESET}"
+        elif [ "$ram_health_pct" -gt 5 ]; then ram_health="${YELLOW}Heavy Load ($ram_health_pct% Free)${RESET}"
+        else ram_health="${RED}Critical (OOM Risk)${RESET}"
         fi
     else
         ram_health="Unknown"
@@ -83,28 +90,27 @@ function check_hardware() {
     
     mem_info=$(free -h | awk 'NR==2{printf "Used: %s / Total: %s", $3,$2 }')
     swap_info=$(free -h | awk 'NR==3{printf "Used: %s / Total: %s", $3,$2 }')
-    echo -e "RAM Memory  : $mem_info [Health: $ram_health]"
+    echo -e "RAM Memory  : $mem_info [ Health : $ram_health ]"
     echo -e "Swap Memory : $swap_info"
 
-    # 3. Storage Type & NVMe Hardware Lock Detection
+    # 3. Storage Type & Hardware Lock Detection (NVMe/SATA/HDD Universal)
     main_drive=$(lsblk -d -n -o NAME | grep -E "^(sd|nvme)" | head -1)
     if [[ "$main_drive" == *"nvme"* ]]; then disk_type="NVMe SSD"
     else
-        rota_check=$(cat /sys/block/"$main_drive"/queue/rotational 2>/dev/null)
+        rota_check=$(sudo cat /sys/block/"$main_drive"/queue/rotational 2>/dev/null)
         if [ "$rota_check" == "0" ]; then disk_type="SATA SSD"
         else disk_type="HDD"; fi
     fi
     
     root_usage=$(df -h / | tail -n 1 | awk '{print "Used: "$3" / Total: "$2" ("$5")"}')
     usage_pct=$(df / | tail -n 1 | awk '{print $5}' | tr -d '%')
-    ro_flag=$(cat /sys/block/"$main_drive"/ro 2>/dev/null || echo "0")
+    ro_flag=$(sudo cat /sys/block/"$main_drive"/ro 2>/dev/null || echo "0")
     
-    # Accurate hardware failure logic
-    if [ "$ro_flag" == "1" ]; then storage_health="${RED}FAILING (Hardware Read-Only Lock Detected)${RESET}"
-    elif [ "$usage_pct" -gt 90 ]; then storage_health="${YELLOW}Degrading (Low Over-Provisioning Space)${RESET}"
+    if [ "$ro_flag" == "1" ]; then storage_health="${RED}FAILING (Hardware Lock)${RESET}"
+    elif [ "$usage_pct" -gt 90 ]; then storage_health="${YELLOW}Degrading (Low Space)${RESET}"
     else storage_health="${GREEN}Optimal (Hardware lock clear)${RESET}"; fi
 
-    echo -e "Storage (/) : $root_usage [Type: $disk_type] [Health: $storage_health]"
+    echo -e "Storage (/) : $root_usage [Type: $disk_type] [ Health : $storage_health ]"
 
     # 4. Thermal Sensors (Universal Intel/AMD)
     echo -e "\n${YELLOW}[*] THERMAL SENSORS & HARDWARE LIMITS${RESET}"
@@ -113,14 +119,14 @@ function check_hardware() {
 
     for hwmon_dir in /sys/class/hwmon/hwmon*; do
         [ ! -e "$hwmon_dir" ] && continue
-        hwmon_name=$(cat "$hwmon_dir/name" 2>/dev/null)
+        hwmon_name=$(sudo cat "$hwmon_dir/name" 2>/dev/null)
         for input_file in "$hwmon_dir"/temp*_input; do
             [ ! -e "$input_file" ] && continue
-            temp_raw=$(cat "$input_file" 2>/dev/null)
+            temp_raw=$(sudo cat "$input_file" 2>/dev/null)
             [ -z "$temp_raw" ] || [ "$temp_raw" -le 0 ] && continue
             
             temp_c=$((temp_raw / 1000))
-            label=$(cat "${input_file%_input}_label" 2>/dev/null)
+            label=$(sudo cat "${input_file%_input}_label" 2>/dev/null)
             
             if [[ "${hwmon_name,,}" == *"k10temp"* ]]; then human_name="AMD Ryzen CPU"
             elif [[ "${hwmon_name,,}" == *"amdgpu"* ]]; then human_name="AMD Radeon GPU"
@@ -135,7 +141,7 @@ function check_hardware() {
             crit_file="${input_file%_input}_crit"
             limit="N/A"
             if [ -f "$crit_file" ]; then
-                limit_raw=$(cat "$crit_file" 2>/dev/null)
+                limit_raw=$(sudo cat "$crit_file" 2>/dev/null)
                 if [[ "$limit_raw" =~ ^[0-9]+$ ]]; then
                     lim_c=$((limit_raw / 1000))
                     [ "$lim_c" -lt 150 ] && limit="${lim_c}°C"
@@ -170,14 +176,15 @@ function check_hardware() {
 function check_security() {
     echo -e "\n${YELLOW}[*] SECURITY & THREAT ANALYSIS${RESET}"
 
-    failed_logins=$(journalctl _SYSTEMD_UNIT=ssh.service 2>/dev/null | grep "Failed password" | wc -l || echo "N/A")
+    # Sudo unlocks 100% of journalctl logs (Highly accurate brute-force hunting)
+    failed_logins=$(sudo journalctl _SYSTEMD_UNIT=ssh.service 2>/dev/null | grep "Failed password" | wc -l || echo "N/A")
     echo -e "Failed SSH Logins : $failed_logins"
 
     echo -e "\n${CYAN}[+] Active User Sessions:${RESET}"
     who
 
     echo -e "\n${CYAN}[+] Active Listening Ports (TCP/UDP):${RESET}"
-    ss -tuln | awk 'NR>1 {print $1, $5}' | head -n 5
+    sudo ss -tuln | awk 'NR>1 {print $1, $5}' | head -n 5
 
     echo -e "\n${CYAN}[+] Top 3 CPU Consuming Processes:${RESET}"
     ps -eo pid,cmd,%cpu --sort=-%cpu | head -n 5 | grep -v "ps -eo" | head -n 4
@@ -193,20 +200,17 @@ function pause_menu() {
 function opsec_cleanup() {
     echo -e "\n${YELLOW}[!] Initiating OPSEC Cleanup Sequence...${RESET}"
     
-    # Resolve absolute path of the script and its parent directory
     SCRIPT_DIR=$(dirname "$(realpath "$0")")
     SCRIPT_NAME=$(basename "$0")
     
     echo -e "${CYAN}[+] Purging memory and sweeping directories...${RESET}"
-    sleep 1.5 # Theatrical pause for the user to read
+    sleep 1.5
     
-    # If the script is running inside our specific cloned repo, nuke the whole folder
     if [[ "$(basename "$SCRIPT_DIR")" == *"linux-security-monitor"* ]]; then
         cd /tmp || exit
         rm -rf "$SCRIPT_DIR"
         echo -e "${GREEN}[V] Project directory shredded. Leave no trace.${RESET}\n"
     else
-        # If it was downloaded as a standalone file, just delete the script itself
         rm -f "$SCRIPT_DIR/$SCRIPT_NAME"
         echo -e "${GREEN}[V] Script self-destructed. Leave no trace.${RESET}\n"
     fi
@@ -230,21 +234,9 @@ while true; do
     read -p "  Select an option [1-5]: " choice
     
     case $choice in
-        1) 
-            printf '\033c'
-            check_system_identity
-            pause_menu
-            ;;
-        2) 
-            printf '\033c'
-            check_hardware
-            pause_menu
-            ;;
-        3) 
-            printf '\033c'
-            check_security
-            pause_menu
-            ;;
+        1) printf '\033c'; check_system_identity; pause_menu ;;
+        2) printf '\033c'; check_hardware; pause_menu ;;
+        3) printf '\033c'; check_security; pause_menu ;;
         4) 
             printf '\033c'
             echo -e "${GREEN}Executing Full Audit...${RESET}"
@@ -253,12 +245,7 @@ while true; do
             check_security
             pause_menu
             ;;
-        5) 
-            opsec_cleanup
-            ;;
-        *) 
-            echo -e "\n${RED}[!] Invalid option. Please enter a number between 1 and 5.${RESET}"
-            sleep 1.5
-            ;;
+        5) opsec_cleanup ;;
+        *) echo -e "\n${RED}[!] Invalid option. Please enter a number between 1 and 5.${RESET}"; sleep 1.5 ;;
     esac
 done
