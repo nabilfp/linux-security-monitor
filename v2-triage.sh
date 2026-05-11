@@ -2,7 +2,7 @@
 
 # ===========================================================================
 # Project        : Linux Security & System Monitor (v2.1)
-# Description    : Interactive Triage Tool with OPSEC & Sudo Accuracy
+# Description    : Interactive Triage Tool with OPSEC & Dynamic Vendor
 # Author         : Nabil
 # Architecture   : Modular Bash (Functions & Case Loop)
 # ===========================================================================
@@ -46,13 +46,12 @@ function check_system_identity() {
 function check_hardware() {
     echo -e "\n${YELLOW}[*] HARDWARE, HEALTH & STORAGE STATUS${RESET}"
 
-    # 1. Advanced Battery Health (With ThinkPad Threshold UX Fix)
+    # 1. Advanced Battery Health
     bat_dir=$(ls -d /sys/class/power_supply/BAT* 2>/dev/null | head -1)
     if [ -n "$bat_dir" ]; then
         bat_status=$(cat "$bat_dir/status" 2>/dev/null)
         bat_cap=$(cat "$bat_dir/capacity" 2>/dev/null)
         
-        # Smart AC Detection to translate confusing Kernel outputs
         ac_online=$(grep -h "1" /sys/class/power_supply/*/online 2>/dev/null | head -1)
         if [[ "$bat_status" == "Not charging" ]] && [[ -n "$ac_online" ]]; then
             bat_status="Plugged In (Threshold/Idle)"
@@ -122,8 +121,13 @@ function check_hardware() {
 
     echo -e "Storage (/) : $root_usage [Type: $disk_type] $storage_str"
 
-    # 4. Thermal Sensors (Universal Intel/AMD)
+    # 4. Thermal Sensors (With Dynamic Vendor Detection)
     echo -e "\n${YELLOW}[*] THERMAL SENSORS & HARDWARE LIMITS${RESET}"
+    
+    # Grab laptop brand from DMI BIOS data
+    sys_vendor=$(sudo cat /sys/class/dmi/id/sys_vendor 2>/dev/null | awk '{print $1}')
+    [ -z "$sys_vendor" ] && sys_vendor="System"
+    
     declare -A sensor_temps
     declare -A sensor_limits
 
@@ -141,10 +145,11 @@ function check_hardware() {
             if [[ "${hwmon_name,,}" == *"k10temp"* ]]; then human_name="AMD Ryzen CPU"
             elif [[ "${hwmon_name,,}" == *"amdgpu"* ]]; then human_name="AMD Radeon GPU"
             elif [[ "${hwmon_name,,}" == "coretemp" ]]; then human_name="Intel CPU"
-            elif [[ "${hwmon_name,,}" == *"mt7921"* || "${hwmon_name,,}" == *"mt7922"* ]]; then human_name="MediaTek Wi-Fi"
+            elif [[ "${hwmon_name,,}" == *"mt7921"* || "${hwmon_name,,}" == *"mt7922"* || "${hwmon_name,,}" == *"iwlwifi"* ]]; then human_name="Wi-Fi Module"
             elif [[ "${hwmon_name,,}" == *"nvme"* ]]; then human_name="NVMe SSD"
-            elif [[ "${hwmon_name,,}" == *"acpitz"* ]]; then human_name="Motherboard (ACPI)"
-            elif [[ "${hwmon_name,,}" == *"thinkpad"* ]]; then human_name="ThinkPad Mainboard"
+            # Dynamic vendor mapping for motherboard sensors
+            elif [[ "${hwmon_name,,}" == *"acpitz"* || "${hwmon_name,,}" == *"thinkpad"* || "${hwmon_name,,}" == *"asus"* || "${hwmon_name,,}" == *"dell"* ]]; then 
+                human_name="${sys_vendor} Mainboard"
             else human_name="$hwmon_name"
             fi
             
