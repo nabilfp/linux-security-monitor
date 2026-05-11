@@ -1,6 +1,6 @@
 # 🛡️ Linux Security Monitor (Interactive Edition)
 
-> A sleek, dependency-free Bash utility built for instant system health checks, hardware telemetry, and security triage. Now with 100% more interactive menus.
+> A sleek, dependency-free Bash utility built for instant system health checks, hardware telemetry, and security triage. Now with interactive menus, 99% accuracy health readouts, and OPSEC self-destruct capabilities.
 
 ---
 
@@ -15,18 +15,20 @@ We started with a basic one-liner script (v1.0) and moved to a deeper, linear tr
 
 ### 🎯 Core Objectives of This Project
 - **Zero Bloatware:** No `npm install`, no Python virtual environments required. Just pure, native Bash.
-- **Stealth & Cleanliness:** It runs, it reports, and it closes. No temporary log files cluttering your system directories anymore. Leave no trace.
-- **Aesthetic by Default:** Terminal tools don't have to be ugly. The new update includes a custom ASCII system fetch that natively pulls your OS, DE, and GTK themes without forcing you to install `neofetch` or `fastfetch`.
+- **OPSEC-First (Leave No Trace):** A true auditor doesn't leave their tools behind. This update introduces ephemeral execution and a self-destruct mechanism to wipe the project folder upon exit.
+- **Aesthetic by Default:** Terminal tools don't have to be ugly. The script includes a custom ASCII system fetch that natively pulls your OS, DE, and GTK themes without forcing you to install `neofetch` or `fastfetch`.
 
 ---
 
 ## 🚀 How to Install & Run (v2.1)
 
-We've moved past the `curl | bash` wild west. To use the new interactive menu properly, grab the repository to your local machine. It takes less than 10 seconds.
+Choose your execution style: the permanent local setup, or the stealthy "Ghost Mode."
 
+### Option A: Standard Interactive (Local Repo)
+Best if you plan to use this frequently on your personal machine.
 ```bash
 # 1. Clone the repository
-git clone [https://github.com/nabilfp/linux-security-monitor.git](https://github.com/nabilfp/linux-security-monitor.git)
+git clone https://github.com/nabilfp/linux-security-monitor.git
 cd linux-security-monitor
 
 # 2. Make it executable
@@ -36,22 +38,30 @@ chmod +x v2-triage.sh
 ./v2-triage.sh
 ```
 
+### Option B: Ghost Mode (Fileless Execution) 👻
+Running an audit on a remote server? Don't leave a footprint. This command downloads and executes the script directly in the machine's RAM.
+```bash
+bash <(curl -sL [https://raw.githubusercontent.com/nabilfp/linux-security-monitor/main/v2-triage.sh](https://raw.githubusercontent.com/nabilfp/linux-security-monitor/main/v2-triage.sh))
+```
+
 ---
 
 ## 🛠️ What's Inside v2.1?
 
 - **Interactive CLI Menu:** Choose exactly what you want to audit (System Identity, Hardware, Security, or a Full Sweep) by just pressing a number.
-- **Native System Fetch:** A built-in Tux ASCII art that dynamically reads your OS release, Kernel, Uptime, and GNOME/GTK configurations natively via `gsettings`.
-- **Smart Thermal Heuristics:** Automatically scans `/sys/class/hwmon/` for CPU, GPU, NVMe, and Wi-Fi temps. If hardware vendors (like AMD) hide their critical limits, the script automatically applies standard SOC safety heuristics (e.g., flagging CPUs at 95°C).
-- **Anti-Observer Process Monitor:** The top CPU process tracker is now smart enough to exclude itself from the list, so you don't get false alarms during your threat hunting.
-- **Threat Triage:** Instant mapping of failed SSH logins (brute-force hunting) and open internet-facing TCP/UDP ports.
+- **High-Accuracy Health Telemetry:** - **Battery:** Calculates your true physical wear-level by comparing the manufacturer's design capacity against the current charge limit.
+  - **RAM:** Reads raw memory pressure directly from `/proc/meminfo` to predict OOM (Out-of-Memory) risks before they happen.
+  - **Storage:** Detects hardware-level "Read-Only" safety locks on failing NVMe SSDs without requiring `sudo` or S.M.A.R.T tools.
+- **Smart Thermal Heuristics:** Automatically scans `/sys/class/hwmon/` for CPU, GPU, NVMe, and Wi-Fi temps. If hardware vendors hide their critical limits, the script automatically applies standard SOC safety heuristics.
+- **Anti-Observer Process Monitor:** The top CPU process tracker is smart enough to exclude itself from the list, preventing false alarms during your threat hunting.
+- **OPSEC Self-Destruct:** Hit option `5` to exit, and the script will securely `rm -rf` its own project directory, leaving the target machine completely untouched.
 
 ---
 
 ## ⚠️ Current Limitations
 
 - **Root Privileges:** Designed to run safely as a normal user. However, deep system logs (like certain failed SSH attempts via `journalctl`) might require `sudo` to display properly depending on your distro's permission settings.
-- **Diagnostic, not IDS:** This is an active triage tool for quick audits, not a 24/7 background Intrusion Detection System. (Though automation is coming in phase 2!)
+- **Diagnostic, not IDS:** This is an active triage tool for quick audits, not a 24/7 background Intrusion Detection System. (Though automation is coming in Phase 2!)
 
 ---
 
