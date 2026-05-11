@@ -28,7 +28,7 @@ Choose your execution style: the permanent local setup, or the stealthy "Ghost M
 Best if you plan to use this frequently on your personal machine.
 ```bash
 # 1. Clone the repository
-git clone https://github.com/nabilfp/linux-security-monitor.git
+git clone [https://github.com/nabilfp/linux-security-monitor.git](https://github.com/nabilfp/linux-security-monitor.git)
 cd linux-security-monitor
 
 # 2. Make it executable
@@ -41,7 +41,7 @@ chmod +x v2-triage.sh
 ### Option B: Ghost Mode (Fileless Execution) 👻
 Running an audit on a remote server? Don't leave a footprint. This command downloads and executes the script directly in the machine's RAM.
 ```bash
-bash <(curl -sL https://raw.githubusercontent.com/nabilfp/linux-security-monitor/main/v2-triage.sh)
+bash <(curl -sL [https://raw.githubusercontent.com/nabilfp/linux-security-monitor/main/v2-triage.sh](https://raw.githubusercontent.com/nabilfp/linux-security-monitor/main/v2-triage.sh))
 ```
 
 ---
@@ -55,6 +55,16 @@ bash <(curl -sL https://raw.githubusercontent.com/nabilfp/linux-security-monitor
 - **Smart Thermal Heuristics:** Automatically scans `/sys/class/hwmon/` for CPU, GPU, NVMe, and Wi-Fi temps. If hardware vendors hide their critical limits, the script automatically applies standard SOC safety heuristics.
 - **Anti-Observer Process Monitor:** The top CPU process tracker is smart enough to exclude itself from the list, preventing false alarms during your threat hunting.
 - **OPSEC Self-Destruct:** Hit option `5` to exit, and the script will securely `rm -rf` its own project directory, leaving the target machine completely untouched.
+
+---
+
+## 🐛 Bug Fixes & UX Polish in v2.1
+
+- **The Observer Effect:** Fixed a false-positive logic flaw where the script's own monitoring process (`ps`) would get flagged as the top CPU consumer.
+- **Dummy NVMe Temps:** Patched a weird Linux kernel quirk where some NVMe controllers reported absurd 65,000°C limits. Added strict sanity guards to filter these out.
+- **Smart Battery Thresholds:** Fixed the scary "Not charging" status on business laptops (like ThinkPads) when Battery Conservation Mode is active. It now correctly cross-references the AC adapter status and identifies as `Plugged In (Threshold/Idle)`.
+- **Dynamic Vendor Detection:** The thermal scanner now dynamically reads your BIOS/DMI data to name your motherboard (e.g., ASUS, Dell, LENOVO) instead of assuming a hardcoded brand.
+- **Deep ACPI Scanning:** Bypassed manufacturer restrictions on thermal limit readings by using `sudo` to cross-reference hidden `thermal_zone` trip points deep within the kernel.
 
 ---
 
