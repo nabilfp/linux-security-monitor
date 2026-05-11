@@ -2,7 +2,7 @@
 
 # ===========================================================================
 # Project        : Linux Security & System Monitor (v2.1)
-# Description    : Interactive Triage Tool with OPSEC & Dynamic Vendor
+# Description    : OPSEC Triage Tool with Deep Sudo Thermal Scanning
 # Author         : Nabil
 # Architecture   : Modular Bash (Functions & Case Loop)
 # ===========================================================================
@@ -20,8 +20,8 @@ printf '\033c'
 echo -e "${CYAN}======================================================${RESET}"
 echo -e "${GREEN}   🛡️  LINUX SECURITY & HEALTH TRIAGE (v2.1-INT) 🛡️   ${RESET}"
 echo -e "${CYAN}======================================================${RESET}"
-echo -e "${YELLOW}[*] Requesting Root (sudo) access for 99% accuracy hardware telemetry...${RESET}"
-sudo -v || { echo -e "${RED}[!] Access Denied. Sudo is required for accurate health scanning.${RESET}"; exit 1; }
+echo -e "${YELLOW}[*] Requesting Root (sudo) access for deep hardware telemetry...${RESET}"
+sudo -v || { echo -e "${RED}[!] Access Denied. Sudo is required for accurate scanning.${RESET}"; exit 1; }
 
 # --- [ FUNCTION 1: SYSTEM IDENTITY & FASTFETCH ] ---
 function check_system_identity() {
@@ -121,10 +121,9 @@ function check_hardware() {
 
     echo -e "Storage (/) : $root_usage [Type: $disk_type] $storage_str"
 
-    # 4. Thermal Sensors (With Dynamic Vendor Detection)
+    # 4. Deep Thermal Sensors (Sudo Enabled)
     echo -e "\n${YELLOW}[*] THERMAL SENSORS & HARDWARE LIMITS${RESET}"
     
-    # Grab laptop brand from DMI BIOS data
     sys_vendor=$(sudo cat /sys/class/dmi/id/sys_vendor 2>/dev/null | awk '{print $1}')
     [ -z "$sys_vendor" ] && sys_vendor="System"
     
@@ -134,6 +133,7 @@ function check_hardware() {
     for hwmon_dir in /sys/class/hwmon/hwmon*; do
         [ ! -e "$hwmon_dir" ] && continue
         hwmon_name=$(sudo cat "$hwmon_dir/name" 2>/dev/null)
+        
         for input_file in "$hwmon_dir"/temp*_input; do
             [ ! -e "$input_file" ] && continue
             temp_raw=$(sudo cat "$input_file" 2>/dev/null)
@@ -147,21 +147,52 @@ function check_hardware() {
             elif [[ "${hwmon_name,,}" == "coretemp" ]]; then human_name="Intel CPU"
             elif [[ "${hwmon_name,,}" == *"mt7921"* || "${hwmon_name,,}" == *"mt7922"* || "${hwmon_name,,}" == *"iwlwifi"* ]]; then human_name="Wi-Fi Module"
             elif [[ "${hwmon_name,,}" == *"nvme"* ]]; then human_name="NVMe SSD"
-            # Dynamic vendor mapping for motherboard sensors
             elif [[ "${hwmon_name,,}" == *"acpitz"* || "${hwmon_name,,}" == *"thinkpad"* || "${hwmon_name,,}" == *"asus"* || "${hwmon_name,,}" == *"dell"* ]]; then 
                 human_name="${sys_vendor} Mainboard"
             else human_name="$hwmon_name"
             fi
             
-            crit_file="${input_file%_input}_crit"
             limit="N/A"
-            if [ -f "$crit_file" ]; then
-                limit_raw=$(sudo cat "$crit_file" 2>/dev/null)
-                if [[ "$limit_raw" =~ ^[0-9]+$ ]]; then
-                    lim_c=$((limit_raw / 1000))
-                    [ "$lim_c" -lt 150 ] && limit="${lim_c}°C"
+            # Deep Sudo Scan: Check Emergency, Critical, then Max
+            for ext in emergency crit max; do
+                lim_file="${input_file%_input}_${ext}"
+                if [ -f "$lim_file" ]; then
+                    limit_raw=$(sudo cat "$lim_file" 2>/dev/null)
+                    if [[ "$limit_raw" =~ ^[0-9]+$ ]] && [ "$limit_raw" -gt 0 ]; then
+                        lim_c=$((limit_raw / 1000))
+                        # Strict Sanity Check: Limits must be between 30C and 130C
+                        if [ "$lim_c" -lt 130 ] && [ "$lim_c" -gt 30 ]; then
+                            limit="${lim_c}°C"
+                            [ "$ext" == "max" ] && limit="${lim_c}°C (Max)"
+                            break
+                        fi
+                    fi
                 fi
+            done
+            
+            # Cross-reference with ACPI Thermal Zones if hwmon refuses to yield limit
+            if [ "$limit" == "N/A" ]; then
+                for zone in /sys/class/thermal/thermal_zone*; do
+                    z_type=$(sudo cat "$zone/type" 2>/dev/null)
+                    if [[ "${z_type,,}" == *"${hwmon_name,,}"* ]] || [[ "${hwmon_name,,}" == *"${z_type,,}"* ]]; then
+                        for trip_type in "$zone"/trip_point_*_type; do
+                            t_type=$(sudo cat "$trip_type" 2>/dev/null)
+                            if [[ "$t_type" == "critical" ]]; then
+                                trip_temp_file="${trip_type%_type}_temp"
+                                limit_raw=$(sudo cat "$trip_temp_file" 2>/dev/null)
+                                if [[ "$limit_raw" =~ ^[0-9]+$ ]] && [ "$limit_raw" -gt 0 ]; then
+                                    lim_c=$((limit_raw / 1000))
+                                    if [ "$lim_c" -lt 130 ] && [ "$lim_c" -gt 30 ]; then
+                                        limit="${lim_c}°C (Zone)"
+                                        break 2
+                                    fi
+                                fi
+                            fi
+                        done
+                    fi
+                done
             fi
+
             sensor_temps["$human_name"]="${temp_c}°C"
             [ "$limit" != "N/A" ] && sensor_limits["$human_name"]="$limit"
         done
