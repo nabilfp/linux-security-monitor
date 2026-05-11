@@ -2,7 +2,7 @@
 
 # ===========================================================================
 # Project        : Linux Security & System Monitor (v2.1)
-# Description    : Interactive Triage Tool with Fastfetch Integration
+# Description    : Interactive Triage Tool with Health Telemetry
 # Author         : Nabil
 # Architecture   : Modular Bash (Functions & Case Loop)
 # ===========================================================================
@@ -19,13 +19,11 @@ RESET='\033[0m'
 function check_system_identity() {
     echo -e "\n${YELLOW}[*] SYSTEM IDENTITY & GUI TELEMETRY${RESET}"
     
-    # Unix Philosophy: Use existing tools if available (Hyper-efficient)
     if command -v fastfetch &> /dev/null; then
         fastfetch
     elif command -v neofetch &> /dev/null; then
         neofetch
     else
-        # Native fallback for headless servers without fetch tools
         echo -e "OS Release  : $(cat /etc/os-release | grep "PRETTY_NAME" | cut -d'=' -f2 | tr -d '\"')"
         echo -e "Kernel      : $(uname -r)"
         echo -e "Uptime      : $(uptime -p)"
@@ -38,19 +36,47 @@ function check_system_identity() {
 
 # --- [ FUNCTION 2: HARDWARE & THERMAL ] ---
 function check_hardware() {
-    echo -e "\n${YELLOW}[*] HARDWARE & STORAGE STATUS${RESET}"
+    echo -e "\n${YELLOW}[*] HARDWARE, HEALTH & STORAGE STATUS${RESET}"
 
-    if [ -d /sys/class/power_supply/BAT0 ]; then
-        bat_status=$(cat /sys/class/power_supply/BAT0/status 2>/dev/null)
-        bat_cap=$(cat /sys/class/power_supply/BAT0/capacity 2>/dev/null)
-        echo -e "Battery     : ${bat_cap}% (${bat_status})"
+    # 1. Advanced Battery Health (Wear Level Calculation)
+    bat_dir=""
+    if [ -d /sys/class/power_supply/BAT0 ]; then bat_dir="/sys/class/power_supply/BAT0"
+    elif [ -d /sys/class/power_supply/BAT1 ]; then bat_dir="/sys/class/power_supply/BAT1"; fi
+
+    if [ -n "$bat_dir" ]; then
+        bat_status=$(cat "$bat_dir/status" 2>/dev/null)
+        bat_cap=$(cat "$bat_dir/capacity" 2>/dev/null)
+        
+        if [ -f "$bat_dir/energy_full" ] && [ -f "$bat_dir/energy_full_design" ]; then
+            f=$(cat "$bat_dir/energy_full" 2>/dev/null); d=$(cat "$bat_dir/energy_full_design" 2>/dev/null)
+            bat_health=$(( 100 * f / d ))
+        elif [ -f "$bat_dir/charge_full" ] && [ -f "$bat_dir/charge_full_design" ]; then
+            f=$(cat "$bat_dir/charge_full" 2>/dev/null); d=$(cat "$bat_dir/charge_full_design" 2>/dev/null)
+            bat_health=$(( 100 * f / d ))
+        else
+            bat_health="N/A"
+        fi
+        
+        [ "$bat_health" != "N/A" ] && hlth_str="[Health: ${bat_health}%]" || hlth_str=""
+        echo -e "Battery     : ${bat_cap}% (${bat_status}) ${hlth_str}"
+    else
+        echo -e "Battery     : Not present (Desktop / VM)"
     fi
 
+    # 2. RAM Memory Health (Pressure Heuristics)
     mem_info=$(free -h | awk 'NR==2{printf "Used: %s / Total: %s", $3,$2 }')
+    mem_pct=$(free | awk 'NR==2{printf "%.0f", $3*100/$2}')
+    
+    if [ "$mem_pct" -lt 80 ]; then ram_health="${GREEN}Healthy${RESET}"
+    elif [ "$mem_pct" -lt 95 ]; then ram_health="${YELLOW}Heavy Load${RESET}"
+    else ram_health="${RED}Critical${RESET}"; fi
+    
     swap_info=$(free -h | awk 'NR==3{printf "Used: %s / Total: %s", $3,$2 }')
-    echo -e "RAM Memory  : $mem_info"
+    
+    echo -e "RAM Memory  : $mem_info [Status: $ram_health]"
     echo -e "Swap Memory : $swap_info"
 
+    # 3. Storage Type & NVMe Health Heuristics
     main_drive=$(lsblk -d -n -o NAME | grep -E "^(sd|nvme)" | head -1)
     if [[ "$main_drive" == *"nvme"* ]]; then disk_type="NVMe SSD"
     else
@@ -58,9 +84,18 @@ function check_hardware() {
         if [ "$rota_check" == "0" ]; then disk_type="SATA SSD"
         else disk_type="HDD"; fi
     fi
+    
     root_usage=$(df -h / | tail -n 1 | awk '{print "Used: "$3" / Total: "$2" ("$5")"}')
-    echo -e "Storage (/) : $root_usage [Type: $disk_type]"
+    usage_pct=$(df / | tail -n 1 | awk '{print $5}' | tr -d '%')
+    ro_flag=$(cat /sys/block/"$main_drive"/ro 2>/dev/null || echo "0")
+    
+    if [ "$ro_flag" == "1" ]; then storage_health="${RED}FAILING (Hardware Read-Only Lock)${RESET}"
+    elif [ "$usage_pct" -gt 90 ]; then storage_health="${YELLOW}Warning (Low over-provisioning hurts SSD lifespan)${RESET}"
+    else storage_health="${GREEN}Optimal${RESET}"; fi
 
+    echo -e "Storage (/) : $root_usage [Type: $disk_type] [Health: $storage_health]"
+
+    # 4. Thermal Sensors (Universal Intel/AMD)
     echo -e "\n${YELLOW}[*] THERMAL SENSORS & HARDWARE LIMITS${RESET}"
     declare -A sensor_temps
     declare -A sensor_limits
@@ -151,7 +186,7 @@ while true; do
     echo -e "${CYAN}======================================================${RESET}"
     echo -e "  ${BOLD}INTERACTIVE MENU${RESET}"
     echo -e "  1. System Identity & GUI Telemetry (Fastfetch)"
-    echo -e "  2. Hardware & Thermal Status"
+    echo -e "  2. Hardware & Thermal Status (With Health Check)"
     echo -e "  3. Security & Threat Analysis"
     echo -e "  4. Execute Full System Audit (All of the above)"
     echo -e "  5. Exit"
