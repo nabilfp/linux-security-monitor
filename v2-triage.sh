@@ -2,7 +2,7 @@
 
 # ===========================================================================
 # Project        : Linux Security & System Monitor (v2.1)
-# Description    : Interactive Triage Tool with Consistent Health UI
+# Description    : Interactive Triage Tool with OPSEC & Sudo Accuracy
 # Author         : Nabil
 # Architecture   : Modular Bash (Functions & Case Loop)
 # ===========================================================================
@@ -46,11 +46,17 @@ function check_system_identity() {
 function check_hardware() {
     echo -e "\n${YELLOW}[*] HARDWARE, HEALTH & STORAGE STATUS${RESET}"
 
-    # 1. Advanced Battery Health
+    # 1. Advanced Battery Health (With ThinkPad Threshold UX Fix)
     bat_dir=$(ls -d /sys/class/power_supply/BAT* 2>/dev/null | head -1)
     if [ -n "$bat_dir" ]; then
         bat_status=$(cat "$bat_dir/status" 2>/dev/null)
         bat_cap=$(cat "$bat_dir/capacity" 2>/dev/null)
+        
+        # Smart AC Detection to translate confusing Kernel outputs
+        ac_online=$(grep -h "1" /sys/class/power_supply/*/online 2>/dev/null | head -1)
+        if [[ "$bat_status" == "Not charging" ]] && [[ -n "$ac_online" ]]; then
+            bat_status="Plugged In (Threshold/Idle)"
+        fi
         
         design=$(sudo cat "$bat_dir/energy_full_design" 2>/dev/null || sudo cat "$bat_dir/charge_full_design" 2>/dev/null)
         current=$(sudo cat "$bat_dir/energy_full" 2>/dev/null || sudo cat "$bat_dir/charge_full" 2>/dev/null)
@@ -72,7 +78,7 @@ function check_hardware() {
         echo -e "Battery     : Not present (Desktop / VM)"
     fi
 
-    # 2. RAM Memory Health (Mapped to % format for UI Consistency)
+    # 2. RAM Memory Health
     mem_total=$(awk '/MemTotal/ {print $2}' /proc/meminfo)
     mem_avail=$(awk '/MemAvailable/ {print $2}' /proc/meminfo)
     
@@ -92,7 +98,7 @@ function check_hardware() {
     echo -e "RAM Memory  : $mem_info $ram_str"
     echo -e "Swap Memory : $swap_info"
 
-    # 3. Storage Type & Hardware Lock Detection (Mapped to % format)
+    # 3. Storage Type & Hardware Lock Detection
     main_drive=$(lsblk -d -n -o NAME | grep -E "^(sd|nvme)" | head -1)
     if [[ "$main_drive" == *"nvme"* ]]; then disk_type="NVMe SSD"
     else
@@ -105,7 +111,6 @@ function check_hardware() {
     usage_pct=$(df / | tail -n 1 | awk '{print $5}' | tr -d '%')
     ro_flag=$(sudo cat /sys/block/"$main_drive"/ro 2>/dev/null || echo "0")
     
-    # Storage health string logic
     if [ "$ro_flag" == "1" ]; then 
         storage_str="[ Bad : ${RED}0%${RESET} ]"
     elif [ "$usage_pct" -gt 90 ]; then 
