@@ -41,7 +41,7 @@ chmod +x v2-triage.sh
 ### Option B: Ghost Mode (Fileless Execution) 👻
 Running an audit on a remote server? Don't leave a footprint. This command downloads and executes the script directly in the machine's RAM.
 ```bash
-bash <(curl -sL [https://raw.githubusercontent.com/nabilfp/linux-security-monitor/main/v2-triage.sh](https://raw.githubusercontent.com/nabilfp/linux-security-monitor/main/v2-triage.sh))
+bash <(curl -sL https://raw.githubusercontent.com/nabilfp/linux-security-monitor/main/v2-triage.sh)
 ```
 
 ---
