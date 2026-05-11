@@ -2,7 +2,7 @@
 
 # ===========================================================================
 # Project        : Linux Security & System Monitor (v2.1)
-# Description    : Interactive Triage Tool with 99% Accuracy Health Telemetry
+# Description    : Interactive Triage Tool with OPSEC Self-Destruct
 # Author         : Nabil
 # Architecture   : Modular Bash (Functions & Case Loop)
 # ===========================================================================
@@ -52,13 +52,15 @@ function check_hardware() {
             health_pct=$(( 100 * current / design ))
             [ "$health_pct" -gt 100 ] && health_pct=100
             
-            if [ "$health_pct" -ge 80 ]; then health_color="${GREEN}"
-            elif [ "$health_pct" -ge 50 ]; then health_color="${YELLOW}"
-            else health_color="${RED}"; fi
-            
-            hlth_str="[Health: ${health_color}${health_pct}%${RESET} (Physical Wear Level)]"
+            if [ "$health_pct" -ge 80 ]; then 
+                hlth_str="[ Health : ${GREEN}${health_pct}%${RESET} ]"
+            elif [ "$health_pct" -ge 50 ]; then 
+                hlth_str="[ Health : ${YELLOW}${health_pct}%${RESET} ]"
+            else 
+                hlth_str="[ Bad : ${RED}${health_pct}%${RESET} ]"
+            fi
         else
-            hlth_str="[Health: N/A]"
+            hlth_str="[ Health : N/A ]"
         fi
         echo -e "Battery     : ${bat_cap}% (${bat_status}) ${hlth_str}"
     else
@@ -187,6 +189,30 @@ function pause_menu() {
     read -p "Press [ENTER] to return to the Main Menu..."
 }
 
+# --- [ FUNCTION 4: OPSEC SELF-DESTRUCT ] ---
+function opsec_cleanup() {
+    echo -e "\n${YELLOW}[!] Initiating OPSEC Cleanup Sequence...${RESET}"
+    
+    # Resolve absolute path of the script and its parent directory
+    SCRIPT_DIR=$(dirname "$(realpath "$0")")
+    SCRIPT_NAME=$(basename "$0")
+    
+    echo -e "${CYAN}[+] Purging memory and sweeping directories...${RESET}"
+    sleep 1.5 # Theatrical pause for the user to read
+    
+    # If the script is running inside our specific cloned repo, nuke the whole folder
+    if [[ "$(basename "$SCRIPT_DIR")" == *"linux-security-monitor"* ]]; then
+        cd /tmp || exit
+        rm -rf "$SCRIPT_DIR"
+        echo -e "${GREEN}[V] Project directory shredded. Leave no trace.${RESET}\n"
+    else
+        # If it was downloaded as a standalone file, just delete the script itself
+        rm -f "$SCRIPT_DIR/$SCRIPT_NAME"
+        echo -e "${GREEN}[V] Script self-destructed. Leave no trace.${RESET}\n"
+    fi
+    exit 0
+}
+
 # --- [ MAIN INTERACTIVE LOOP ] ---
 while true; do
     printf '\033c'
@@ -198,7 +224,7 @@ while true; do
     echo -e "  2. Hardware & Thermal Status (With Deep Health Scan)"
     echo -e "  3. Security & Threat Analysis"
     echo -e "  4. Execute Full System Audit (All of the above)"
-    echo -e "  5. Exit"
+    echo -e "  5. Exit & Destroy Trace (OPSEC)"
     echo -e "${CYAN}------------------------------------------------------${RESET}"
     
     read -p "  Select an option [1-5]: " choice
@@ -228,8 +254,7 @@ while true; do
             pause_menu
             ;;
         5) 
-            echo -e "\n${GREEN}Exiting Security Triage. Stay secure!${RESET}\n"
-            exit 0
+            opsec_cleanup
             ;;
         *) 
             echo -e "\n${RED}[!] Invalid option. Please enter a number between 1 and 5.${RESET}"
