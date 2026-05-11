@@ -2,7 +2,7 @@
 
 # ===========================================================================
 # Project        : Linux Security & System Monitor (v2.1)
-# Description    : Interactive Triage Tool with Fastfetch-style OS Telemetry
+# Description    : Interactive Triage Tool with Fastfetch Integration
 # Author         : Nabil
 # Architecture   : Modular Bash (Functions & Case Loop)
 # ===========================================================================
@@ -12,57 +12,28 @@ CYAN='\033[0;36m'
 GREEN='\033[0;32m'
 RED='\033[0;31m'
 YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
 BOLD='\033[1m'
 RESET='\033[0m'
 
-# --- [ FUNCTION 1: FASTFETCH & SYSTEM IDENTITY ] ---
-function check_system_fastfetch() {
+# --- [ FUNCTION 1: SYSTEM IDENTITY & FASTFETCH ] ---
+function check_system_identity() {
     echo -e "\n${YELLOW}[*] SYSTEM IDENTITY & GUI TELEMETRY${RESET}"
     
-    # Data Extraction
-    os_name=$(cat /etc/os-release | grep "PRETTY_NAME" | cut -d'=' -f2 | tr -d '\"')
-    kernel_ver=$(uname -r)
-    uptime_val=$(uptime -p | sed 's/up //')
-    pkg_dpkg=$(dpkg-query -f '.\n' -W 2>/dev/null | wc -l || echo "0")
-    pkg_snap=$(snap list 2>/dev/null | tail -n +2 | wc -l || echo "0")
-    shell_val=$(basename "$SHELL")
-    
-    # GUI & Display Telemetry (Native Fallbacks)
-    de_val=${XDG_CURRENT_DESKTOP:-"CLI / Headless"}
-    wm_val=${XDG_SESSION_TYPE:-"Unknown"}
-    res_val=$(cat /sys/class/drm/card*/modes 2>/dev/null | head -1 || echo "Unknown")
-    
-    # GNOME Theming Extraction (Via gsettings)
-    if command -v gsettings &> /dev/null; then
-        theme_val=$(gsettings get org.gnome.desktop.interface gtk-theme 2>/dev/null | tr -d "'")
-        icons_val=$(gsettings get org.gnome.desktop.interface icon-theme 2>/dev/null | tr -d "'")
-        cursor_val=$(gsettings get org.gnome.desktop.interface cursor-theme 2>/dev/null | tr -d "'")
-        font_val=$(gsettings get org.gnome.desktop.interface font-name 2>/dev/null | tr -d "'")
+    # Unix Philosophy: Use existing tools if available (Hyper-efficient)
+    if command -v fastfetch &> /dev/null; then
+        fastfetch
+    elif command -v neofetch &> /dev/null; then
+        neofetch
     else
-        theme_val="N/A"; icons_val="N/A"; cursor_val="N/A"; font_val="N/A"
+        # Native fallback for headless servers without fetch tools
+        echo -e "OS Release  : $(cat /etc/os-release | grep "PRETTY_NAME" | cut -d'=' -f2 | tr -d '\"')"
+        echo -e "Kernel      : $(uname -r)"
+        echo -e "Uptime      : $(uptime -p)"
+        echo -e "Shell       : $(basename "$SHELL")"
     fi
-
-    # Printing the Fastfetch-style ASCII Art (Tux)
-    echo -e ""
-    echo -e "${CYAN}       .---.      ${CYAN}${BOLD}$USER${RESET}@${CYAN}${BOLD}$(hostname)${RESET}"
-    echo -e "${CYAN}      /     \     ${RESET}---------------------------------"
-    echo -e "${CYAN}      \\.@-@./     ${YELLOW}OS${RESET}: $os_name"
-    echo -e "${CYAN}      /\`\\_/\\`\\     ${YELLOW}Kernel${RESET}: Linux $kernel_ver"
-    echo -e "${CYAN}     //  _  \\\\    ${YELLOW}Uptime${RESET}: $uptime_val"
-    echo -e "${CYAN}    | \\     )|_   ${YELLOW}Packages${RESET}: $pkg_dpkg (dpkg), $pkg_snap (snap)"
-    echo -e "${CYAN}    /\`\\_\`>  <_/ \\  ${YELLOW}Shell${RESET}: $shell_val"
-    echo -e "${CYAN}    \\__/'---'\\__/ ${YELLOW}Resolution${RESET}: $res_val"
-    echo -e "                  ${YELLOW}DE${RESET}: $de_val (${wm_val^^})"
-    echo -e "                  ${YELLOW}Theme${RESET}: $theme_val"
-    echo -e "                  ${YELLOW}Icons${RESET}: $icons_val"
-    echo -e "                  ${YELLOW}Cursor${RESET}: $cursor_val"
-    echo -e "                  ${YELLOW}Terminal${RESET}: $TERM"
-    echo -e "                  ${YELLOW}Locale${RESET}: $LANG"
-    echo -e ""
     
     pub_ip=$(curl -s --max-time 3 https://ifconfig.me || echo "Offline / Unreachable")
-    echo -e "${GREEN}[+] Network Edge: ${RESET}Public IP is $pub_ip"
+    echo -e "\n${GREEN}[+] Network Edge: ${RESET}Public IP is $pub_ip"
 }
 
 # --- [ FUNCTION 2: HARDWARE & THERMAL ] ---
@@ -94,7 +65,6 @@ function check_hardware() {
     declare -A sensor_temps
     declare -A sensor_limits
 
-    # Scan HWMON (Universal Cross-Platform)
     for hwmon_dir in /sys/class/hwmon/hwmon*; do
         [ ! -e "$hwmon_dir" ] && continue
         hwmon_name=$(cat "$hwmon_dir/name" 2>/dev/null)
@@ -192,7 +162,7 @@ while true; do
     case $choice in
         1) 
             printf '\033c'
-            check_system_fastfetch
+            check_system_identity
             pause_menu
             ;;
         2) 
@@ -208,7 +178,7 @@ while true; do
         4) 
             printf '\033c'
             echo -e "${GREEN}Executing Full Audit...${RESET}"
-            check_system_fastfetch
+            check_system_identity
             check_hardware
             check_security
             pause_menu
