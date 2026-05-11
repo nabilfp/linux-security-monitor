@@ -2,7 +2,7 @@
 
 # ===========================================================================
 # Project        : Linux Security & System Monitor (v2.1)
-# Description    : Interactive Triage Tool with OPSEC & Sudo Accuracy
+# Description    : Interactive Triage Tool with Consistent Health UI
 # Author         : Nabil
 # Architecture   : Modular Bash (Functions & Case Loop)
 # ===========================================================================
@@ -46,7 +46,7 @@ function check_system_identity() {
 function check_hardware() {
     echo -e "\n${YELLOW}[*] HARDWARE, HEALTH & STORAGE STATUS${RESET}"
 
-    # 1. Advanced Battery Health (99% Accurate Wear Level Calculation)
+    # 1. Advanced Battery Health
     bat_dir=$(ls -d /sys/class/power_supply/BAT* 2>/dev/null | head -1)
     if [ -n "$bat_dir" ]; then
         bat_status=$(cat "$bat_dir/status" 2>/dev/null)
@@ -59,10 +59,8 @@ function check_hardware() {
             health_pct=$(( 100 * current / design ))
             [ "$health_pct" -gt 100 ] && health_pct=100
             
-            if [ "$health_pct" -ge 80 ]; then 
+            if [ "$health_pct" -ge 50 ]; then 
                 hlth_str="[ Health : ${GREEN}${health_pct}%${RESET} ]"
-            elif [ "$health_pct" -ge 50 ]; then 
-                hlth_str="[ Health : ${YELLOW}${health_pct}%${RESET} ]"
             else 
                 hlth_str="[ Bad : ${RED}${health_pct}%${RESET} ]"
             fi
@@ -74,26 +72,27 @@ function check_hardware() {
         echo -e "Battery     : Not present (Desktop / VM)"
     fi
 
-    # 2. RAM Memory Health (99% Accurate Pressure Reading - DDR1-DDR5 Universal)
+    # 2. RAM Memory Health (Mapped to % format for UI Consistency)
     mem_total=$(awk '/MemTotal/ {print $2}' /proc/meminfo)
     mem_avail=$(awk '/MemAvailable/ {print $2}' /proc/meminfo)
     
     if [[ -n "$mem_total" && -n "$mem_avail" ]]; then
         ram_health_pct=$(( 100 * mem_avail / mem_total ))
-        if [ "$ram_health_pct" -gt 20 ]; then ram_health="${GREEN}Optimal ($ram_health_pct% Free)${RESET}"
-        elif [ "$ram_health_pct" -gt 5 ]; then ram_health="${YELLOW}Heavy Load ($ram_health_pct% Free)${RESET}"
-        else ram_health="${RED}Critical (OOM Risk)${RESET}"
+        if [ "$ram_health_pct" -ge 50 ]; then 
+            ram_str="[ Health : ${GREEN}${ram_health_pct}%${RESET} ]"
+        else 
+            ram_str="[ Bad : ${RED}${ram_health_pct}%${RESET} ]"
         fi
     else
-        ram_health="Unknown"
+        ram_str="[ Health : N/A ]"
     fi
     
     mem_info=$(free -h | awk 'NR==2{printf "Used: %s / Total: %s", $3,$2 }')
     swap_info=$(free -h | awk 'NR==3{printf "Used: %s / Total: %s", $3,$2 }')
-    echo -e "RAM Memory  : $mem_info [ Health : $ram_health ]"
+    echo -e "RAM Memory  : $mem_info $ram_str"
     echo -e "Swap Memory : $swap_info"
 
-    # 3. Storage Type & Hardware Lock Detection (NVMe/SATA/HDD Universal)
+    # 3. Storage Type & Hardware Lock Detection (Mapped to % format)
     main_drive=$(lsblk -d -n -o NAME | grep -E "^(sd|nvme)" | head -1)
     if [[ "$main_drive" == *"nvme"* ]]; then disk_type="NVMe SSD"
     else
@@ -106,11 +105,17 @@ function check_hardware() {
     usage_pct=$(df / | tail -n 1 | awk '{print $5}' | tr -d '%')
     ro_flag=$(sudo cat /sys/block/"$main_drive"/ro 2>/dev/null || echo "0")
     
-    if [ "$ro_flag" == "1" ]; then storage_health="${RED}FAILING (Hardware Lock)${RESET}"
-    elif [ "$usage_pct" -gt 90 ]; then storage_health="${YELLOW}Degrading (Low Space)${RESET}"
-    else storage_health="${GREEN}Optimal (Hardware lock clear)${RESET}"; fi
+    # Storage health string logic
+    if [ "$ro_flag" == "1" ]; then 
+        storage_str="[ Bad : ${RED}0%${RESET} ]"
+    elif [ "$usage_pct" -gt 90 ]; then 
+        free_space=$(( 100 - usage_pct ))
+        storage_str="[ Bad : ${RED}${free_space}%${RESET} ]"
+    else 
+        storage_str="[ Health : ${GREEN}100%${RESET} ]"
+    fi
 
-    echo -e "Storage (/) : $root_usage [Type: $disk_type] [ Health : $storage_health ]"
+    echo -e "Storage (/) : $root_usage [Type: $disk_type] $storage_str"
 
     # 4. Thermal Sensors (Universal Intel/AMD)
     echo -e "\n${YELLOW}[*] THERMAL SENSORS & HARDWARE LIMITS${RESET}"
@@ -176,7 +181,6 @@ function check_hardware() {
 function check_security() {
     echo -e "\n${YELLOW}[*] SECURITY & THREAT ANALYSIS${RESET}"
 
-    # Sudo unlocks 100% of journalctl logs (Highly accurate brute-force hunting)
     failed_logins=$(sudo journalctl _SYSTEMD_UNIT=ssh.service 2>/dev/null | grep "Failed password" | wc -l || echo "N/A")
     echo -e "Failed SSH Logins : $failed_logins"
 
