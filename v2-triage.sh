@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # ===========================================================================
-# Project        : Linux Security & System Monitor (v2.1)
-# Description    : OPSEC Triage Tool with Deep Sudo Thermal Scanning
+# Project        : Linux Security & System Monitor (v2.2)
+# Description    : OPSEC Triage Tool with Network Baselining
 # Author         : Nabil
 # Architecture   : Modular Bash (Functions & Case Loop)
 # ===========================================================================
@@ -18,7 +18,7 @@ RESET='\033[0m'
 # --- [ GOD MODE: SUDO CHECK ] ---
 printf '\033c'
 echo -e "${CYAN}======================================================${RESET}"
-echo -e "${GREEN}   🛡️  LINUX SECURITY & HEALTH TRIAGE (v2.1-INT) 🛡️   ${RESET}"
+echo -e "${GREEN}   🛡️  LINUX SECURITY & HEALTH TRIAGE (v2.2-INT) 🛡️   ${RESET}"
 echo -e "${CYAN}======================================================${RESET}"
 echo -e "${YELLOW}[*] Requesting Root (sudo) access for deep hardware telemetry...${RESET}"
 sudo -v || { echo -e "${RED}[!] Access Denied. Sudo is required for accurate scanning.${RESET}"; exit 1; }
@@ -153,14 +153,12 @@ function check_hardware() {
             fi
             
             limit="N/A"
-            # Deep Sudo Scan: Check Emergency, Critical, then Max
             for ext in emergency crit max; do
                 lim_file="${input_file%_input}_${ext}"
                 if [ -f "$lim_file" ]; then
                     limit_raw=$(sudo cat "$lim_file" 2>/dev/null)
                     if [[ "$limit_raw" =~ ^[0-9]+$ ]] && [ "$limit_raw" -gt 0 ]; then
                         lim_c=$((limit_raw / 1000))
-                        # Strict Sanity Check: Limits must be between 30C and 130C
                         if [ "$lim_c" -lt 130 ] && [ "$lim_c" -gt 30 ]; then
                             limit="${lim_c}°C"
                             [ "$ext" == "max" ] && limit="${lim_c}°C (Max)"
@@ -170,7 +168,6 @@ function check_hardware() {
                 fi
             done
             
-            # Cross-reference with ACPI Thermal Zones if hwmon refuses to yield limit
             if [ "$limit" == "N/A" ]; then
                 for zone in /sys/class/thermal/thermal_zone*; do
                     z_type=$(sudo cat "$zone/type" 2>/dev/null)
@@ -218,9 +215,9 @@ function check_hardware() {
     fi
 }
 
-# --- [ FUNCTION 3: SECURITY & THREATS ] ---
+# --- [ FUNCTION 3: SECURITY & THREATS (V2.2 BASELINING) ] ---
 function check_security() {
-    echo -e "\n${YELLOW}[*] SECURITY & THREAT ANALYSIS${RESET}"
+    echo -e "\n${YELLOW}[*] SECURITY, THREAT & NETWORK BASELINE${RESET}"
 
     failed_logins=$(sudo journalctl _SYSTEMD_UNIT=ssh.service 2>/dev/null | grep "Failed password" | wc -l || echo "N/A")
     echo -e "Failed SSH Logins : $failed_logins"
@@ -228,11 +225,59 @@ function check_security() {
     echo -e "\n${CYAN}[+] Active User Sessions:${RESET}"
     who
 
-    echo -e "\n${CYAN}[+] Active Listening Ports (TCP/UDP):${RESET}"
-    sudo ss -tuln | awk 'NR>1 {print $1, $5}' | head -n 5
+    # --- NETWORK BASELINING LOGIC ---
+    echo -e "\n${CYAN}[+] Network Port Baselining (TCP/UDP):${RESET}"
+    BASELINE_FILE="/tmp/.v2_net_baseline.txt"
+    
+    # Capture current state
+    sudo ss -tuln | awk 'NR>1 {print $1, $5}' | sort -u > /tmp/.v2_current_ports.txt
+    
+    if [ ! -f "$BASELINE_FILE" ]; then
+        # First Run: Establish Baseline
+        cp /tmp/.v2_current_ports.txt "$BASELINE_FILE"
+        echo -e "${GREEN}[V] Initial network baseline established! (${BOLD}$(wc -l < "$BASELINE_FILE")${RESET}${GREEN} ports saved)${RESET}"
+        echo -e "    Subsequent checks will flag newly opened ports as suspicious."
+        echo -e "\n  Current Open Ports:"
+        while read p; do echo -e "    $p"; done < "$BASELINE_FILE"
+    else
+        # Subsequent Runs: Compare & Hunt
+        echo -e "${YELLOW}[*] Comparing current perimeter against saved baseline...${RESET}"
+        
+        # Mathematical set comparison
+        new_ports=$(comm -13 "$BASELINE_FILE" /tmp/.v2_current_ports.txt)
+        closed_ports=$(comm -23 "$BASELINE_FILE" /tmp/.v2_current_ports.txt)
+        
+        if [ -z "$new_ports" ]; then
+            echo -e "${GREEN}[V] No anomalous new ports detected. Network matches baseline.${RESET}"
+        else
+            echo -e "${RED}${BOLD}[!] ALERT: NEW UNRECOGNIZED PORTS DETECTED! Potential Backdoor!${RESET}"
+        fi
+        
+        echo -e "\n  Current Open Ports State:"
+        while read port; do
+            if echo "$new_ports" | grep -F -q -x "$port"; then
+                # Sudo-powered PID/Process Hunter for the rogue port
+                pid_info=$(sudo ss -tulnp | grep -F "$port" | awk '{print $7}' | cut -d'"' -f2 | head -n 1)
+                [ -z "$pid_info" ] && pid_info="Unknown/Hidden Process"
+                echo -e "    ${RED}${BOLD}$port  <-- [NEW / SUSPICIOUS] (App: $pid_info)${RESET}"
+            else
+                echo -e "    ${GREEN}$port  (Baseline)${RESET}"
+            fi
+        done < /tmp/.v2_current_ports.txt
+        
+        if [ -n "$closed_ports" ]; then
+            echo -e "\n  ${CYAN}[i] Note: Some baseline ports have closed:${RESET}"
+            while read port; do echo -e "    ${YELLOW}$port  (Closed)${RESET}"; done <<< "$closed_ports"
+        fi
+        
+        echo -e "\n  ${CYAN}Tip: To permanently reset this baseline, use the OPSEC Exit (Option 5).${RESET}"
+    fi
 
     echo -e "\n${CYAN}[+] Top 3 CPU Consuming Processes:${RESET}"
     ps -eo pid,cmd,%cpu --sort=-%cpu | head -n 5 | grep -v "ps -eo" | head -n 4
+    
+    # Cleanup temp state
+    rm -f /tmp/.v2_current_ports.txt
 }
 
 # --- [ UTILITY FUNCTION: PAUSE ] ---
@@ -248,16 +293,19 @@ function opsec_cleanup() {
     SCRIPT_DIR=$(dirname "$(realpath "$0")")
     SCRIPT_NAME=$(basename "$0")
     
-    echo -e "${CYAN}[+] Purging memory and sweeping directories...${RESET}"
+    echo -e "${CYAN}[+] Purging memory, baselines, and sweeping directories...${RESET}"
     sleep 1.5
+    
+    # Nuke the baseline file regardless of where we are
+    rm -f /tmp/.v2_net_baseline.txt
     
     if [[ "$(basename "$SCRIPT_DIR")" == *"linux-security-monitor"* ]]; then
         cd /tmp || exit
         rm -rf "$SCRIPT_DIR"
-        echo -e "${GREEN}[V] Project directory shredded. Leave no trace.${RESET}\n"
+        echo -e "${GREEN}[V] Baseline purged. Project directory shredded. Leave no trace.${RESET}\n"
     else
         rm -f "$SCRIPT_DIR/$SCRIPT_NAME"
-        echo -e "${GREEN}[V] Script self-destructed. Leave no trace.${RESET}\n"
+        echo -e "${GREEN}[V] Baseline purged. Script self-destructed. Leave no trace.${RESET}\n"
     fi
     exit 0
 }
@@ -266,12 +314,12 @@ function opsec_cleanup() {
 while true; do
     printf '\033c'
     echo -e "${CYAN}======================================================${RESET}"
-    echo -e "${GREEN}   🛡️  LINUX SECURITY & HEALTH TRIAGE (v2.1-INT) 🛡️   ${RESET}"
+    echo -e "${GREEN}   🛡️  LINUX SECURITY & HEALTH TRIAGE (v2.2-INT) 🛡️   ${RESET}"
     echo -e "${CYAN}======================================================${RESET}"
     echo -e "  ${BOLD}INTERACTIVE MENU${RESET}"
     echo -e "  1. System Identity & GUI Telemetry (Fastfetch)"
     echo -e "  2. Hardware & Thermal Status (With Deep Health Scan)"
-    echo -e "  3. Security & Threat Analysis"
+    echo -e "  3. Security & Threat Analysis (Network Baselining)"
     echo -e "  4. Execute Full System Audit (All of the above)"
     echo -e "  5. Exit & Destroy Trace (OPSEC)"
     echo -e "${CYAN}------------------------------------------------------${RESET}"
