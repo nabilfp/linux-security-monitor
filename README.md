@@ -25,7 +25,7 @@ We started with a basic one-liner script (v1.0) and moved to an active Threat Hu
 No installation required. A true auditor doesn't leave a footprint. This command downloads and executes the script directly in your machine's RAM without saving a single file to your hard drive.
 
 ```
-bash <(curl -sL https://raw.githubusercontent.com/nabilfp/linux-security-monitor/main/v2-triage.sh)
+bash <(curl -sL https://raw.githubusercontent.com/nabilfp/linux-security-monitor/main/v3-monitor.sh)
 ```
 
 *(Note: If you decide to set up Daily SOAR Automation inside the interactive menu, the script will automatically fetch its own binary and safely implant it into `/usr/local/bin/`.)*
