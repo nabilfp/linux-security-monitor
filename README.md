@@ -20,29 +20,15 @@ We started with a basic one-liner script (v1.0) and moved to an active Threat Hu
 
 ---
 
-## 🚀 How to Install & Run (v3.0)
+## 🚀 How to Run: Ghost Mode (Fileless Execution) 👻
 
-Choose your execution style: the permanent local setup, or the stealthy "Ghost Mode."
+No installation required. A true auditor doesn't leave a footprint. This command downloads and executes the script directly in your machine's RAM without saving a single file to your hard drive.
 
-### Option A: Standard Interactive (Local Repo)
-Best if you plan to use this frequently on your personal machine.
-```bash
-# 1. Clone the repository
-git clone https://github.com/nabilfp/linux-security-monitor.git
-cd linux-security-monitor
-
-# 2. Make it executable
-chmod +x v3-monitor.sh
-
-# 3. Launch the interactive menu
-./v3-monitor.sh
+```
+bash <(curl -sL https://raw.githubusercontent.com/nabilfp/linux-security-monitor/main/v2-triage.sh)
 ```
 
-### Option B: Ghost Mode (Fileless Execution) 👻
-Running an audit on a remote server? Don't leave a footprint. This command downloads and executes the script directly in the machine's RAM.
-```bash
-bash <(curl -sL https://raw.githubusercontent.com/nabilfp/linux-security-monitor/main/v3-monitor.sh)
-```
+*(Note: If you decide to set up Daily SOAR Automation inside the interactive menu, the script will automatically fetch its own binary and safely implant it into `/usr/local/bin/`.)*
 
 ---
 
@@ -63,7 +49,7 @@ bash <(curl -sL https://raw.githubusercontent.com/nabilfp/linux-security-monitor
 
 - **Intelligent Ghost Mode Detection:** When setting up daily automation, the script now detects if it's running in RAM (Ghost Mode). If so, it dynamically fetches its own binary from GitHub to plant into the system securely.
 - **Persistent vs Ephemeral Baselines:** Network baselines were moved to `/var/tmp/` so they survive system reboots for the daily cronjob, but they are still safely shredded by the OPSEC exit protocol.
-- **Graceful Interrupts:** Implemented `trap` signals for `SIGINT/SIGTERM`. If you press `Ctrl+C`, the script exits gracefully instead of causing a runaway loop.
+- **Graceful Interrupts:** Implemented `trap` signals for `SIGINT/SIGTERM`. If you press `Ctrl+C` or accidentally paste a huge block of text into the terminal, the script will vacuum the stdin buffer and exit gracefully instead of causing a runaway spam loop.
 - **i18n Matrix Implementation:** Solved the localization problem cleanly via a high-performance Language Dictionary Matrix loaded into memory before execution.
 
 ---
