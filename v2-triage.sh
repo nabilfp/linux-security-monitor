@@ -1,11 +1,14 @@
 #!/bin/bash
 
 # ===========================================================================
-# Project        : Linux Security & System Monitor (v3.0-Global)
-# Description    : Enterprise SOAR Tool with Network Baselining & Auto-Cron
+# Project        : Linux Security & System Monitor (v3.0.1-Global)
+# Description    : Enterprise SOAR Tool (Bugfix: Trap SIGINT & Ghost Mode)
 # Author         : Nabil
 # Architecture   : Modular Bash (Dictionary Matrix, Headless Logic, Case Loop)
 # ===========================================================================
+
+# --- [ TRAP: GRACEFUL EXIT ON CTRL+C OR BROKEN PIPE ] ---
+trap 'echo -e "\n\n\033[0;31m[!] Execution aborted by user (SIGINT). Stay secure!\033[0m"; exit 0' INT TERM
 
 # --- [ HEADLESS CRON MODE (SOAR AUTOMATION) ] ---
 if [[ "$1" == "--cron" ]]; then
@@ -53,7 +56,7 @@ function set_lang_en() {
     UI_OPT5="Automation / SOAR (Setup Daily Cronjob)"
     UI_OPT6="Exit & Destroy Trace (OPSEC)"
     UI_PROMPT="Select an option [1-6]: "
-    UI_INVALID="[!] Invalid option. Please enter a number between 1 and 6."
+    UI_INVALID="[!] Invalid option. Please enter a valid number."
     UI_PAUSE="Press [ENTER] to return to the Main Menu..."
     UI_SUDO_REQ="[*] Requesting Root (sudo) access for deep hardware telemetry..."
     UI_SUDO_FAIL="[!] Access Denied. Sudo is required for accurate scanning."
@@ -74,6 +77,7 @@ function set_lang_en() {
     UI_OPSEC_DO="[+] Purging memory, baselines, and sweeping directories..."
     UI_OPSEC_DONE="[V] Baseline purged. Trace destroyed. Leave no trace."
     UI_AUTO_SETUP="[*] Automating Security Audit (SOAR Setup)..."
+    UI_AUTO_GHOST="[+] Ghost Mode detected. Fetching binary directly from repository..."
     UI_AUTO_SUCCESS="[V] Automation active! Background audits will run daily at 02:00 AM."
 }
 
@@ -86,7 +90,7 @@ function set_lang_id() {
     UI_OPT5="Otomatisasi / SOAR (Pasang Cronjob Harian)"
     UI_OPT6="Keluar & Hapus Jejak (Protokol OPSEC)"
     UI_PROMPT="Pilih opsi [1-6]: "
-    UI_INVALID="[!] Pilihan tidak valid. Masukkan angka 1 sampai 6."
+    UI_INVALID="[!] Pilihan tidak valid. Silakan masukkan angka yang benar."
     UI_PAUSE="Tekan [ENTER] untuk kembali ke Menu Utama..."
     UI_SUDO_REQ="[*] Meminta akses Root (sudo) untuk akurasi telemetri perangkat keras..."
     UI_SUDO_FAIL="[!] Akses Ditolak. Sudo diwajibkan untuk pemindaian akurat."
@@ -107,6 +111,7 @@ function set_lang_id() {
     UI_OPSEC_DO="[+] Menghapus memori, baseline, dan membersihkan direktori..."
     UI_OPSEC_DONE="[V] Baseline dihapus. Jejak dihancurkan. Tanpa jejak."
     UI_AUTO_SETUP="[*] Mengonfigurasi Audit Keamanan Otomatis (SOAR)..."
+    UI_AUTO_GHOST="[+] Ghost Mode terdeteksi. Mengunduh binary langsung dari repositori..."
     UI_AUTO_SUCCESS="[V] Otomatisasi aktif! Audit latar belakang akan berjalan tiap 02:00 pagi."
 }
 
@@ -119,7 +124,7 @@ function set_lang_zh() {
     UI_OPT5="自动化 / SOAR (设置每日定时任务)"
     UI_OPT6="退出并销毁痕迹 (OPSEC 协议)"
     UI_PROMPT="请选择一个选项 [1-6]: "
-    UI_INVALID="[!] 无效选项。请输入 1 到 6 之间的数字。"
+    UI_INVALID="[!] 无效选项。请输入正确的数字。"
     UI_PAUSE="按 [ENTER] 键返回主菜单..."
     UI_SUDO_REQ="[*] 请求 Root (sudo) 权限以进行深度硬件遥测..."
     UI_SUDO_FAIL="[!] 访问被拒绝。高精度扫描需要 Sudo 权限。"
@@ -140,6 +145,7 @@ function set_lang_zh() {
     UI_OPSEC_DO="[+] 正在清除内存、基线并扫描目录..."
     UI_OPSEC_DONE="[V] 基线已清除。痕迹已销毁。不留痕迹。"
     UI_AUTO_SETUP="[*] 正在设置自动化安全审计 (SOAR)..."
+    UI_AUTO_GHOST="[+] 检测到 Ghost 模式。正在从存储库直接获取二进制文件..."
     UI_AUTO_SUCCESS="[V] 自动化已激活！后台审计将每天凌晨 02:00 运行。"
 }
 
@@ -153,7 +159,9 @@ if [[ "$1" != "--cron" ]]; then
     echo -e "  2. Bahasa Indonesia"
     echo -e "  3. Mandarin (中文)"
     echo -e "${CYAN}------------------------------------------------------${RESET}"
-    read -p "  [1-3]: " lang_choice
+    
+    # Safe read logic to prevent broken pipe infinite loop
+    read -r -p "  [1-3]: " lang_choice || exit 1
 
     case $lang_choice in
         2) set_lang_id ;;
@@ -351,7 +359,6 @@ function check_security() {
     who
 
     echo -e "\n${CYAN}[+] TCP/UDP Ports:${RESET}"
-    # Move baseline to /var/tmp/ so it survives reboots for the daily cronjob
     BASELINE_FILE="/var/tmp/.v3_net_baseline.txt"
     
     sudo ss -tuln | awk 'NR>1 {print $1, $5}' | sort -u > /tmp/.v3_current_ports.txt
@@ -396,16 +403,22 @@ function check_security() {
 function setup_automation() {
     echo -e "\n${YELLOW}${UI_AUTO_SETUP}${RESET}"
     
-    SCRIPT_PATH=$(realpath "$0")
     BIN_PATH="/usr/local/bin/linux-security-monitor"
     CRON_PATH="/etc/cron.d/linux-security-monitor"
     LOG_PATH="/var/log/linux-security-monitor.log"
 
-    # 1. Copy script to a safe enterprise execution path
-    sudo cp "$SCRIPT_PATH" "$BIN_PATH"
+    # Deep Check: Are we physical or in Ghost Mode (Memory Pipe)?
+    if [[ -f "$0" ]]; then
+        sudo cp "$0" "$BIN_PATH"
+    else
+        echo -e "${CYAN}    ${UI_AUTO_GHOST}${RESET}"
+        # Fetch directly from your repository to bypass the ephemeral memory limitation
+        sudo curl -sL "https://raw.githubusercontent.com/nabilfp/linux-security-monitor/main/v2-triage.sh" -o "$BIN_PATH"
+    fi
+
     sudo chmod +x "$BIN_PATH"
     
-    # 2. Inject Cronjob (Executes daily at 02:00 AM as root)
+    # Inject Cronjob (Executes daily at 02:00 AM as root)
     echo "0 2 * * * root $BIN_PATH --cron >> $LOG_PATH 2>&1" | sudo tee "$CRON_PATH" > /dev/null
     
     echo -e "${GREEN}${UI_AUTO_SUCCESS}${RESET}"
@@ -448,7 +461,7 @@ fi
 # --- [ UTILITY FUNCTION: PAUSE ] ---
 function pause_menu() {
     echo -e "\n${CYAN}======================================================${RESET}"
-    read -p "${UI_PAUSE}"
+    read -r -p "${UI_PAUSE}" || exit 1
 }
 
 # --- [ MAIN INTERACTIVE LOOP ] ---
@@ -466,7 +479,8 @@ while true; do
     echo -e "  6. ${UI_OPT6}"
     echo -e "${CYAN}------------------------------------------------------${RESET}"
     
-    read -p "  ${UI_PROMPT}" choice
+    # Safe read logic: Abort loop gracefully if standard input breaks (e.g. copy-paste error)
+    read -r -p "  ${UI_PROMPT}" choice || exit 1
     
     case $choice in
         1) printf '\033c'; check_system_identity; pause_menu ;;
