@@ -1,26 +1,29 @@
 #!/bin/bash
 
 # ===========================================================================
-# Project        : Linux Security & System Monitor (v3.0.1-Global)
-# Description    : Enterprise SOAR Tool (Bugfix: Trap SIGINT & Ghost Mode)
+# Project        : Linux Security & System Monitor (v3.0.2-Global)
+# Description    : Enterprise SOAR Tool (Anti-Spam Stdin & Trap Fix)
 # Author         : Nabil
 # Architecture   : Modular Bash (Dictionary Matrix, Headless Logic, Case Loop)
 # ===========================================================================
 
-# --- [ TRAP: GRACEFUL EXIT ON CTRL+C OR BROKEN PIPE ] ---
-trap 'echo -e "\n\n\033[0;31m[!] Execution aborted by user (SIGINT). Stay secure!\033[0m"; exit 0' INT TERM
+# --- [ TRAP: GRACEFUL EXIT ON CTRL+C ] ---
+trap 'echo -e "\n\n\033[0;31m[!] Execution aborted by user (Ctrl+C). Stay secure!\033[0m"; exit 1' SIGINT SIGTERM
+
+# --- [ ANTI-SPAM UTILITY: STDIN BUFFER VACUUM ] ---
+# Mengosongkan sisa teks di terminal akibat copy-paste tidak sengaja
+function clear_input_buffer() {
+    while read -r -t 0.01; do :; done
+}
 
 # --- [ HEADLESS CRON MODE (SOAR AUTOMATION) ] ---
 if [[ "$1" == "--cron" ]]; then
-    # Strip ANSI colors for clean log files
     CYAN=''; GREEN=''; RED=''; YELLOW=''; BOLD=''; RESET=''
     
-    # Establish log header
     echo "======================================================"
     echo "  [$(date +'%Y-%m-%d %H:%M:%S')] AUTOMATED SOC AUDIT"
     echo "======================================================"
     
-    # Bypass bootloader and force English
     UI_HDR_SYS="[*] SYSTEM IDENTITY & GUI TELEMETRY"
     UI_HDR_HW="[*] HARDWARE, HEALTH & STORAGE STATUS"
     UI_HDR_THERM="[*] THERMAL SENSORS & HARDWARE LIMITS"
@@ -56,7 +59,7 @@ function set_lang_en() {
     UI_OPT5="Automation / SOAR (Setup Daily Cronjob)"
     UI_OPT6="Exit & Destroy Trace (OPSEC)"
     UI_PROMPT="Select an option [1-6]: "
-    UI_INVALID="[!] Invalid option. Please enter a valid number."
+    UI_INVALID="[!] Invalid option. Please enter a valid number (1-6)."
     UI_PAUSE="Press [ENTER] to return to the Main Menu..."
     UI_SUDO_REQ="[*] Requesting Root (sudo) access for deep hardware telemetry..."
     UI_SUDO_FAIL="[!] Access Denied. Sudo is required for accurate scanning."
@@ -90,7 +93,7 @@ function set_lang_id() {
     UI_OPT5="Otomatisasi / SOAR (Pasang Cronjob Harian)"
     UI_OPT6="Keluar & Hapus Jejak (Protokol OPSEC)"
     UI_PROMPT="Pilih opsi [1-6]: "
-    UI_INVALID="[!] Pilihan tidak valid. Silakan masukkan angka yang benar."
+    UI_INVALID="[!] Pilihan tidak valid. Silakan masukkan angka 1 sampai 6."
     UI_PAUSE="Tekan [ENTER] untuk kembali ke Menu Utama..."
     UI_SUDO_REQ="[*] Meminta akses Root (sudo) untuk akurasi telemetri perangkat keras..."
     UI_SUDO_FAIL="[!] Akses Ditolak. Sudo diwajibkan untuk pemindaian akurat."
@@ -124,7 +127,7 @@ function set_lang_zh() {
     UI_OPT5="自动化 / SOAR (设置每日定时任务)"
     UI_OPT6="退出并销毁痕迹 (OPSEC 协议)"
     UI_PROMPT="请选择一个选项 [1-6]: "
-    UI_INVALID="[!] 无效选项。请输入正确的数字。"
+    UI_INVALID="[!] 无效选项。请输入 1 到 6 之间的正确数字。"
     UI_PAUSE="按 [ENTER] 键返回主菜单..."
     UI_SUDO_REQ="[*] 请求 Root (sudo) 权限以进行深度硬件遥测..."
     UI_SUDO_FAIL="[!] 访问被拒绝。高精度扫描需要 Sudo 权限。"
@@ -160,7 +163,7 @@ if [[ "$1" != "--cron" ]]; then
     echo -e "  3. Mandarin (中文)"
     echo -e "${CYAN}------------------------------------------------------${RESET}"
     
-    # Safe read logic to prevent broken pipe infinite loop
+    clear_input_buffer
     read -r -p "  [1-3]: " lang_choice || exit 1
 
     case $lang_choice in
@@ -171,7 +174,7 @@ if [[ "$1" != "--cron" ]]; then
 
     printf '\033c'
     echo -e "${CYAN}======================================================${RESET}"
-    echo -e "${GREEN}   🛡️  LINUX SECURITY & HEALTH TRIAGE (v3.0-SOAR) 🛡️   ${RESET}"
+    echo -e "${GREEN}   🛡️  LINUX SECURITY & HEALTH TRIAGE (v3.0.2-SOAR) 🛡️   ${RESET}"
     echo -e "${CYAN}======================================================${RESET}"
     echo -e "${YELLOW}${UI_SUDO_REQ}${RESET}"
     sudo -v || { echo -e "${RED}${UI_SUDO_FAIL}${RESET}"; exit 1; }
@@ -407,18 +410,16 @@ function setup_automation() {
     CRON_PATH="/etc/cron.d/linux-security-monitor"
     LOG_PATH="/var/log/linux-security-monitor.log"
 
-    # Deep Check: Are we physical or in Ghost Mode (Memory Pipe)?
+    # Fix: Intelligent Physical vs Ghost Mode Detection
     if [[ -f "$0" ]]; then
         sudo cp "$0" "$BIN_PATH"
     else
         echo -e "${CYAN}    ${UI_AUTO_GHOST}${RESET}"
-        # Fetch directly from your repository to bypass the ephemeral memory limitation
         sudo curl -sL "https://raw.githubusercontent.com/nabilfp/linux-security-monitor/main/v2-triage.sh" -o "$BIN_PATH"
     fi
 
     sudo chmod +x "$BIN_PATH"
     
-    # Inject Cronjob (Executes daily at 02:00 AM as root)
     echo "0 2 * * * root $BIN_PATH --cron >> $LOG_PATH 2>&1" | sudo tee "$CRON_PATH" > /dev/null
     
     echo -e "${GREEN}${UI_AUTO_SUCCESS}${RESET}"
@@ -435,7 +436,6 @@ function opsec_cleanup() {
     echo -e "${CYAN}${UI_OPSEC_DO}${RESET}"
     sleep 1.5
     
-    # Nuke the permanent baseline
     sudo rm -f /var/tmp/.v3_net_baseline.txt
     
     if [[ "$(basename "$SCRIPT_DIR")" == *"linux-security-monitor"* ]]; then
@@ -461,6 +461,7 @@ fi
 # --- [ UTILITY FUNCTION: PAUSE ] ---
 function pause_menu() {
     echo -e "\n${CYAN}======================================================${RESET}"
+    clear_input_buffer
     read -r -p "${UI_PAUSE}" || exit 1
 }
 
@@ -468,7 +469,7 @@ function pause_menu() {
 while true; do
     printf '\033c'
     echo -e "${CYAN}======================================================${RESET}"
-    echo -e "${GREEN}   🛡️  LINUX SECURITY & HEALTH TRIAGE (v3.0-SOAR) 🛡️   ${RESET}"
+    echo -e "${GREEN}   🛡️  LINUX SECURITY & HEALTH TRIAGE (v3.0.2-SOAR) 🛡️   ${RESET}"
     echo -e "${CYAN}======================================================${RESET}"
     echo -e "  ${BOLD}${UI_MENU_TITLE}${RESET}"
     echo -e "  1. ${UI_OPT1}"
@@ -479,7 +480,8 @@ while true; do
     echo -e "  6. ${UI_OPT6}"
     echo -e "${CYAN}------------------------------------------------------${RESET}"
     
-    # Safe read logic: Abort loop gracefully if standard input breaks (e.g. copy-paste error)
+    # Menghapus paksa teks "sampah" / paste dari clipboard sebelum meminta input
+    clear_input_buffer
     read -r -p "  ${UI_PROMPT}" choice || exit 1
     
     case $choice in
