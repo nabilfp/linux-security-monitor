@@ -1,19 +1,47 @@
 #!/bin/bash
 
 # ===========================================================================
-# Project        : Linux Security & System Monitor (v2.2-Global)
-# Description    : OPSEC Triage Tool with Network Baselining & i18n Support
+# Project        : Linux Security & System Monitor (v3.0-Global)
+# Description    : Enterprise SOAR Tool with Network Baselining & Auto-Cron
 # Author         : Nabil
-# Architecture   : Modular Bash (Dictionary Matrix, Functions & Case Loop)
+# Architecture   : Modular Bash (Dictionary Matrix, Headless Logic, Case Loop)
 # ===========================================================================
 
-# --- [ UI COLOR VARIABLES ] ---
-CYAN='\033[0;36m'
-GREEN='\033[0;32m'
-RED='\033[0;31m'
-YELLOW='\033[1;33m'
-BOLD='\033[1m'
-RESET='\033[0m'
+# --- [ HEADLESS CRON MODE (SOAR AUTOMATION) ] ---
+if [[ "$1" == "--cron" ]]; then
+    # Strip ANSI colors for clean log files
+    CYAN=''; GREEN=''; RED=''; YELLOW=''; BOLD=''; RESET=''
+    
+    # Establish log header
+    echo "======================================================"
+    echo "  [$(date +'%Y-%m-%d %H:%M:%S')] AUTOMATED SOC AUDIT"
+    echo "======================================================"
+    
+    # Bypass bootloader and force English
+    UI_HDR_SYS="[*] SYSTEM IDENTITY & GUI TELEMETRY"
+    UI_HDR_HW="[*] HARDWARE, HEALTH & STORAGE STATUS"
+    UI_HDR_THERM="[*] THERMAL SENSORS & HARDWARE LIMITS"
+    UI_HDR_SEC="[*] SECURITY, THREAT & NETWORK BASELINE"
+    UI_NET_EDGE="Network Edge"
+    UI_HLT="Health"
+    UI_BAD="Bad"
+    UI_BASE_EST="[V] Initial network baseline established!"
+    UI_BASE_SUB="Subsequent checks will flag newly opened ports as suspicious."
+    UI_BASE_COMP="[*] Comparing current perimeter against saved baseline..."
+    UI_BASE_OK="[V] No anomalous new ports detected. Network matches baseline."
+    UI_BASE_ALERT="[!] ALERT: NEW UNRECOGNIZED PORTS DETECTED! Potential Backdoor!"
+    UI_NEW_SUSP="[NEW / SUSPICIOUS]"
+fi
+
+# --- [ UI COLOR VARIABLES (Interactive Mode) ] ---
+if [[ "$1" != "--cron" ]]; then
+    CYAN='\033[0;36m'
+    GREEN='\033[0;32m'
+    RED='\033[0;31m'
+    YELLOW='\033[1;33m'
+    BOLD='\033[1m'
+    RESET='\033[0m'
+fi
 
 # --- [ LANGUAGE DICTIONARY (i18n) ] ---
 function set_lang_en() {
@@ -22,9 +50,10 @@ function set_lang_en() {
     UI_OPT2="Hardware & Thermal Status (Deep Scan)"
     UI_OPT3="Security & Threat Analysis (Network Baseline)"
     UI_OPT4="Execute Full System Audit"
-    UI_OPT5="Exit & Destroy Trace (OPSEC)"
-    UI_PROMPT="Select an option [1-5]: "
-    UI_INVALID="[!] Invalid option. Please enter a number between 1 and 5."
+    UI_OPT5="Automation / SOAR (Setup Daily Cronjob)"
+    UI_OPT6="Exit & Destroy Trace (OPSEC)"
+    UI_PROMPT="Select an option [1-6]: "
+    UI_INVALID="[!] Invalid option. Please enter a number between 1 and 6."
     UI_PAUSE="Press [ENTER] to return to the Main Menu..."
     UI_SUDO_REQ="[*] Requesting Root (sudo) access for deep hardware telemetry..."
     UI_SUDO_FAIL="[!] Access Denied. Sudo is required for accurate scanning."
@@ -44,6 +73,8 @@ function set_lang_en() {
     UI_OPSEC_INIT="[!] Initiating OPSEC Cleanup Sequence..."
     UI_OPSEC_DO="[+] Purging memory, baselines, and sweeping directories..."
     UI_OPSEC_DONE="[V] Baseline purged. Trace destroyed. Leave no trace."
+    UI_AUTO_SETUP="[*] Automating Security Audit (SOAR Setup)..."
+    UI_AUTO_SUCCESS="[V] Automation active! Background audits will run daily at 02:00 AM."
 }
 
 function set_lang_id() {
@@ -52,9 +83,10 @@ function set_lang_id() {
     UI_OPT2="Status Perangkat Keras & Suhu (Pindai Mendalam)"
     UI_OPT3="Analisis Keamanan & Ancaman (Network Baseline)"
     UI_OPT4="Jalankan Audit Sistem Penuh"
-    UI_OPT5="Keluar & Hapus Jejak (Protokol OPSEC)"
-    UI_PROMPT="Pilih opsi [1-5]: "
-    UI_INVALID="[!] Pilihan tidak valid. Masukkan angka 1 sampai 5."
+    UI_OPT5="Otomatisasi / SOAR (Pasang Cronjob Harian)"
+    UI_OPT6="Keluar & Hapus Jejak (Protokol OPSEC)"
+    UI_PROMPT="Pilih opsi [1-6]: "
+    UI_INVALID="[!] Pilihan tidak valid. Masukkan angka 1 sampai 6."
     UI_PAUSE="Tekan [ENTER] untuk kembali ke Menu Utama..."
     UI_SUDO_REQ="[*] Meminta akses Root (sudo) untuk akurasi telemetri perangkat keras..."
     UI_SUDO_FAIL="[!] Akses Ditolak. Sudo diwajibkan untuk pemindaian akurat."
@@ -74,6 +106,8 @@ function set_lang_id() {
     UI_OPSEC_INIT="[!] Memulai Sekuens Pembersihan OPSEC..."
     UI_OPSEC_DO="[+] Menghapus memori, baseline, dan membersihkan direktori..."
     UI_OPSEC_DONE="[V] Baseline dihapus. Jejak dihancurkan. Tanpa jejak."
+    UI_AUTO_SETUP="[*] Mengonfigurasi Audit Keamanan Otomatis (SOAR)..."
+    UI_AUTO_SUCCESS="[V] Otomatisasi aktif! Audit latar belakang akan berjalan tiap 02:00 pagi."
 }
 
 function set_lang_zh() {
@@ -82,9 +116,10 @@ function set_lang_zh() {
     UI_OPT2="硬件与温度状态 (高精度扫描)"
     UI_OPT3="安全与威胁分析 (网络基线)"
     UI_OPT4="执行完整系统审计"
-    UI_OPT5="退出并销毁痕迹 (OPSEC 协议)"
-    UI_PROMPT="请选择一个选项 [1-5]: "
-    UI_INVALID="[!] 无效选项。请输入 1 到 5 之间的数字。"
+    UI_OPT5="自动化 / SOAR (设置每日定时任务)"
+    UI_OPT6="退出并销毁痕迹 (OPSEC 协议)"
+    UI_PROMPT="请选择一个选项 [1-6]: "
+    UI_INVALID="[!] 无效选项。请输入 1 到 6 之间的数字。"
     UI_PAUSE="按 [ENTER] 键返回主菜单..."
     UI_SUDO_REQ="[*] 请求 Root (sudo) 权限以进行深度硬件遥测..."
     UI_SUDO_FAIL="[!] 访问被拒绝。高精度扫描需要 Sudo 权限。"
@@ -104,40 +139,43 @@ function set_lang_zh() {
     UI_OPSEC_INIT="[!] 正在启动 OPSEC 清理程序..."
     UI_OPSEC_DO="[+] 正在清除内存、基线并扫描目录..."
     UI_OPSEC_DONE="[V] 基线已清除。痕迹已销毁。不留痕迹。"
+    UI_AUTO_SETUP="[*] 正在设置自动化安全审计 (SOAR)..."
+    UI_AUTO_SUCCESS="[V] 自动化已激活！后台审计将每天凌晨 02:00 运行。"
 }
 
-# --- [ LANGUAGE SELECTION BOOTLOADER ] ---
-printf '\033c'
-echo -e "${CYAN}======================================================${RESET}"
-echo -e "${GREEN} 🌍 SELECT YOUR LANGUAGE / PILIH BAHASA / 选择语言 🌍 ${RESET}"
-echo -e "${CYAN}======================================================${RESET}"
-echo -e "  1. English (Default)"
-echo -e "  2. Bahasa Indonesia"
-echo -e "  3. Mandarin (中文)"
-echo -e "${CYAN}------------------------------------------------------${RESET}"
-read -p "  [1-3]: " lang_choice
+# --- [ INTERACTIVE BOOTLOADER ] ---
+if [[ "$1" != "--cron" ]]; then
+    printf '\033c'
+    echo -e "${CYAN}======================================================${RESET}"
+    echo -e "${GREEN} 🌍 SELECT YOUR LANGUAGE / PILIH BAHASA / 选择语言 🌍 ${RESET}"
+    echo -e "${CYAN}======================================================${RESET}"
+    echo -e "  1. English (Default)"
+    echo -e "  2. Bahasa Indonesia"
+    echo -e "  3. Mandarin (中文)"
+    echo -e "${CYAN}------------------------------------------------------${RESET}"
+    read -p "  [1-3]: " lang_choice
 
-case $lang_choice in
-    2) set_lang_id ;;
-    3) set_lang_zh ;;
-    *) set_lang_en ;;
-esac
+    case $lang_choice in
+        2) set_lang_id ;;
+        3) set_lang_zh ;;
+        *) set_lang_en ;;
+    esac
 
-# --- [ GOD MODE: SUDO CHECK (Translated) ] ---
-printf '\033c'
-echo -e "${CYAN}======================================================${RESET}"
-echo -e "${GREEN}   🛡️  LINUX SECURITY & HEALTH TRIAGE (v2.2-INT) 🛡️   ${RESET}"
-echo -e "${CYAN}======================================================${RESET}"
-echo -e "${YELLOW}${UI_SUDO_REQ}${RESET}"
-sudo -v || { echo -e "${RED}${UI_SUDO_FAIL}${RESET}"; exit 1; }
+    printf '\033c'
+    echo -e "${CYAN}======================================================${RESET}"
+    echo -e "${GREEN}   🛡️  LINUX SECURITY & HEALTH TRIAGE (v3.0-SOAR) 🛡️   ${RESET}"
+    echo -e "${CYAN}======================================================${RESET}"
+    echo -e "${YELLOW}${UI_SUDO_REQ}${RESET}"
+    sudo -v || { echo -e "${RED}${UI_SUDO_FAIL}${RESET}"; exit 1; }
+fi
 
 # --- [ FUNCTION 1: SYSTEM IDENTITY & FASTFETCH ] ---
 function check_system_identity() {
     echo -e "\n${YELLOW}${UI_HDR_SYS}${RESET}"
     
-    if command -v fastfetch &> /dev/null; then
+    if command -v fastfetch &> /dev/null && [[ "$1" != "--cron" ]]; then
         fastfetch
-    elif command -v neofetch &> /dev/null; then
+    elif command -v neofetch &> /dev/null && [[ "$1" != "--cron" ]]; then
         neofetch
     else
         echo -e "OS Release  : $(cat /etc/os-release | grep "PRETTY_NAME" | cut -d'=' -f2 | tr -d '\"')"
@@ -154,7 +192,6 @@ function check_system_identity() {
 function check_hardware() {
     echo -e "\n${YELLOW}${UI_HDR_HW}${RESET}"
 
-    # 1. Advanced Battery Health
     bat_dir=$(ls -d /sys/class/power_supply/BAT* 2>/dev/null | head -1)
     if [ -n "$bat_dir" ]; then
         bat_status=$(cat "$bat_dir/status" 2>/dev/null)
@@ -181,7 +218,6 @@ function check_hardware() {
         echo -e "Battery     : Not present"
     fi
 
-    # 2. RAM Memory Health
     mem_total=$(awk '/MemTotal/ {print $2}' /proc/meminfo)
     mem_avail=$(awk '/MemAvailable/ {print $2}' /proc/meminfo)
     
@@ -198,7 +234,6 @@ function check_hardware() {
     echo -e "RAM Memory  : $mem_info $ram_str"
     echo -e "Swap Memory : $swap_info"
 
-    # 3. Storage Type & Hardware Lock Detection
     main_drive=$(lsblk -d -n -o NAME | grep -E "^(sd|nvme)" | head -1)
     if [[ "$main_drive" == *"nvme"* ]]; then disk_type="NVMe SSD"
     else
@@ -217,9 +252,7 @@ function check_hardware() {
 
     echo -e "Storage (/) : $root_usage [Type: $disk_type] $storage_str"
 
-    # 4. Deep Thermal Sensors
     echo -e "\n${YELLOW}${UI_HDR_THERM}${RESET}"
-    
     sys_vendor=$(sudo cat /sys/class/dmi/id/sys_vendor 2>/dev/null | awk '{print $1}')
     [ -z "$sys_vendor" ] && sys_vendor="System"
     
@@ -284,7 +317,6 @@ function check_hardware() {
                     fi
                 done
             fi
-
             sensor_temps["$human_name"]="${temp_c}°C"
             [ "$limit" != "N/A" ] && sensor_limits["$human_name"]="$limit"
         done
@@ -308,7 +340,7 @@ function check_hardware() {
     fi
 }
 
-# --- [ FUNCTION 3: SECURITY & THREATS (V2.2 BASELINING) ] ---
+# --- [ FUNCTION 3: SECURITY & BASELINING ] ---
 function check_security() {
     echo -e "\n${YELLOW}${UI_HDR_SEC}${RESET}"
 
@@ -318,14 +350,14 @@ function check_security() {
     echo -e "\n${CYAN}[+] Active User Sessions:${RESET}"
     who
 
-    # --- NETWORK BASELINING LOGIC ---
     echo -e "\n${CYAN}[+] TCP/UDP Ports:${RESET}"
-    BASELINE_FILE="/tmp/.v2_net_baseline.txt"
+    # Move baseline to /var/tmp/ so it survives reboots for the daily cronjob
+    BASELINE_FILE="/var/tmp/.v3_net_baseline.txt"
     
-    sudo ss -tuln | awk 'NR>1 {print $1, $5}' | sort -u > /tmp/.v2_current_ports.txt
+    sudo ss -tuln | awk 'NR>1 {print $1, $5}' | sort -u > /tmp/.v3_current_ports.txt
     
     if [ ! -f "$BASELINE_FILE" ]; then
-        cp /tmp/.v2_current_ports.txt "$BASELINE_FILE"
+        cp /tmp/.v3_current_ports.txt "$BASELINE_FILE"
         echo -e "${GREEN}${UI_BASE_EST}${RESET}"
         echo -e "    ${UI_BASE_SUB}"
         echo -e "\n  Ports:"
@@ -333,8 +365,8 @@ function check_security() {
     else
         echo -e "${YELLOW}${UI_BASE_COMP}${RESET}"
         
-        new_ports=$(comm -13 "$BASELINE_FILE" /tmp/.v2_current_ports.txt)
-        closed_ports=$(comm -23 "$BASELINE_FILE" /tmp/.v2_current_ports.txt)
+        new_ports=$(comm -13 "$BASELINE_FILE" /tmp/.v3_current_ports.txt)
+        closed_ports=$(comm -23 "$BASELINE_FILE" /tmp/.v3_current_ports.txt)
         
         if [ -z "$new_ports" ]; then
             echo -e "${GREEN}${UI_BASE_OK}${RESET}"
@@ -351,22 +383,36 @@ function check_security() {
             else
                 echo -e "    ${GREEN}$port  (Baseline)${RESET}"
             fi
-        done < /tmp/.v2_current_ports.txt
+        done < /tmp/.v3_current_ports.txt
     fi
 
     echo -e "\n${CYAN}[+] Top 3 CPU Processes:${RESET}"
     ps -eo pid,cmd,%cpu --sort=-%cpu | head -n 5 | grep -v "ps -eo" | head -n 4
     
-    rm -f /tmp/.v2_current_ports.txt
+    rm -f /tmp/.v3_current_ports.txt
 }
 
-# --- [ UTILITY FUNCTION: PAUSE ] ---
-function pause_menu() {
-    echo -e "\n${CYAN}======================================================${RESET}"
-    read -p "${UI_PAUSE}"
+# --- [ FUNCTION 4: AUTOMATION (SOAR) SETUP ] ---
+function setup_automation() {
+    echo -e "\n${YELLOW}${UI_AUTO_SETUP}${RESET}"
+    
+    SCRIPT_PATH=$(realpath "$0")
+    BIN_PATH="/usr/local/bin/linux-security-monitor"
+    CRON_PATH="/etc/cron.d/linux-security-monitor"
+    LOG_PATH="/var/log/linux-security-monitor.log"
+
+    # 1. Copy script to a safe enterprise execution path
+    sudo cp "$SCRIPT_PATH" "$BIN_PATH"
+    sudo chmod +x "$BIN_PATH"
+    
+    # 2. Inject Cronjob (Executes daily at 02:00 AM as root)
+    echo "0 2 * * * root $BIN_PATH --cron >> $LOG_PATH 2>&1" | sudo tee "$CRON_PATH" > /dev/null
+    
+    echo -e "${GREEN}${UI_AUTO_SUCCESS}${RESET}"
+    echo -e "${CYAN}    -> Log Path: $LOG_PATH${RESET}"
 }
 
-# --- [ FUNCTION 4: OPSEC SELF-DESTRUCT ] ---
+# --- [ FUNCTION 5: OPSEC SELF-DESTRUCT ] ---
 function opsec_cleanup() {
     echo -e "\n${YELLOW}${UI_OPSEC_INIT}${RESET}"
     
@@ -376,7 +422,8 @@ function opsec_cleanup() {
     echo -e "${CYAN}${UI_OPSEC_DO}${RESET}"
     sleep 1.5
     
-    rm -f /tmp/.v2_net_baseline.txt
+    # Nuke the permanent baseline
+    sudo rm -f /var/tmp/.v3_net_baseline.txt
     
     if [[ "$(basename "$SCRIPT_DIR")" == *"linux-security-monitor"* ]]; then
         cd /tmp || exit
@@ -389,11 +436,26 @@ function opsec_cleanup() {
     exit 0
 }
 
+# --- [ EXECUTE HEADLESS CRON IF FLAG PRESENT ] ---
+if [[ "$1" == "--cron" ]]; then
+    check_system_identity
+    check_hardware
+    check_security
+    echo -e "\n"
+    exit 0
+fi
+
+# --- [ UTILITY FUNCTION: PAUSE ] ---
+function pause_menu() {
+    echo -e "\n${CYAN}======================================================${RESET}"
+    read -p "${UI_PAUSE}"
+}
+
 # --- [ MAIN INTERACTIVE LOOP ] ---
 while true; do
     printf '\033c'
     echo -e "${CYAN}======================================================${RESET}"
-    echo -e "${GREEN}   🛡️  LINUX SECURITY & HEALTH TRIAGE (v2.2-INT) 🛡️   ${RESET}"
+    echo -e "${GREEN}   🛡️  LINUX SECURITY & HEALTH TRIAGE (v3.0-SOAR) 🛡️   ${RESET}"
     echo -e "${CYAN}======================================================${RESET}"
     echo -e "  ${BOLD}${UI_MENU_TITLE}${RESET}"
     echo -e "  1. ${UI_OPT1}"
@@ -401,6 +463,7 @@ while true; do
     echo -e "  3. ${UI_OPT3}"
     echo -e "  4. ${UI_OPT4}"
     echo -e "  5. ${UI_OPT5}"
+    echo -e "  6. ${UI_OPT6}"
     echo -e "${CYAN}------------------------------------------------------${RESET}"
     
     read -p "  ${UI_PROMPT}" choice
@@ -416,7 +479,8 @@ while true; do
             check_security
             pause_menu
             ;;
-        5) opsec_cleanup ;;
+        5) setup_automation; pause_menu ;;
+        6) opsec_cleanup ;;
         *) echo -e "\n${RED}${UI_INVALID}${RESET}"; sleep 1.5 ;;
     esac
 done
