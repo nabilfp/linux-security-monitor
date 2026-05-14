@@ -28,7 +28,7 @@ Choose your execution style: the permanent local setup, or the stealthy "Ghost M
 Best if you plan to use this frequently on your personal machine.
 ```bash
 # 1. Clone the repository
-git clone [https://github.com/nabilfp/linux-security-monitor.git](https://github.com/nabilfp/linux-security-monitor.git)
+git clone https://github.com/nabilfp/linux-security-monitor.git
 cd linux-security-monitor
 
 # 2. Make it executable
@@ -41,7 +41,7 @@ chmod +x v3-monitor.sh
 ### Option B: Ghost Mode (Fileless Execution) 👻
 Running an audit on a remote server? Don't leave a footprint. This command downloads and executes the script directly in the machine's RAM.
 ```bash
-bash <(curl -sL [https://raw.githubusercontent.com/nabilfp/linux-security-monitor/main/v3-monitor.sh](https://raw.githubusercontent.com/nabilfp/linux-security-monitor/main/v3-monitor.sh))
+bash <(curl -sL https://raw.githubusercontent.com/nabilfp/linux-security-monitor/main/v3-monitor.sh)
 ```
 
 ---
