@@ -1,6 +1,6 @@
-# 🛡️ Linux Security Monitor (v2.2 Global Edition)
+# 🛡️ Linux Security Monitor (v3.0 SOAR Edition)
 
-> A sleek, dependency-free Bash utility built for instant system health checks, hardware telemetry, and active security triage. Now featuring Network Port Baselining, Multilingual Support (i18n), and OPSEC self-destruct capabilities.
+> A sleek, dependency-free Bash utility built for instant system health checks, hardware telemetry, and active security triage. Now featuring SOAR Automation, Network Port Baselining, Multilingual Support (i18n), and OPSEC self-destruct capabilities.
 
 ---
 
@@ -10,17 +10,17 @@ Let's be real—monitoring a Linux server or your daily-driver laptop usually go
 
 As an Information Systems student diving deep into the Blue Team (SOC) side of cybersecurity, I wanted a third option. I needed a tool that acts like a quick "vibe check" for any Linux environment. Something you can drop into a server, run instantly without worrying about broken dependencies, and get a clean, human-readable breakdown of what's happening under the hood.
 
-**The Evolution to v2.2:**
-We started with a basic one-liner script (v1.0) and moved to a modular triage tool (v2.1). But for the **v2.2 Global Update**, I wanted to push the boundaries of what pure Bash can do. We transformed this script from a *passive* monitor into an *active* Threat Hunting tool (Mini-IDS) and engineered a dynamic dictionary matrix so it can be deployed by international teams.
+**The Evolution to v3.0:**
+We started with a basic one-liner script (v1.0) and moved to an active Threat Hunting tool (v2.2). But for the **v3.0 SOAR Update**, we breached the barrier of manual execution. The script can now install itself as a headless background process, providing hands-free, automated security auditing every single day.
 
 ### 🎯 Core Objectives of This Project
 - **Zero Bloatware:** No `npm install`, no Python virtual environments required. Just pure, native Bash.
 - **OPSEC-First (Leave No Trace):** A true auditor doesn't leave their tools behind. This update features ephemeral execution and a self-destruct mechanism to wipe both the project folder and temporary baselines upon exit.
-- **Borderless (i18n):** Security has no language barrier. The UI dynamically shifts languages without duplicating script files or requiring external libraries.
+- **Automated (SOAR):** Capable of setting up its own root-level cronjobs for daily execution without spamming your storage with massive log files.
 
 ---
 
-## 🚀 How to Install & Run (v2.2)
+## 🚀 How to Install & Run (v3.0)
 
 Choose your execution style: the permanent local setup, or the stealthy "Ghost Mode."
 
@@ -28,50 +28,50 @@ Choose your execution style: the permanent local setup, or the stealthy "Ghost M
 Best if you plan to use this frequently on your personal machine.
 ```bash
 # 1. Clone the repository
-git clone https://github.com/nabilfp/linux-security-monitor.git
+git clone [https://github.com/nabilfp/linux-security-monitor.git](https://github.com/nabilfp/linux-security-monitor.git)
 cd linux-security-monitor
 
 # 2. Make it executable
-chmod +x v2-triage.sh
+chmod +x v3-monitor.sh
 
 # 3. Launch the interactive menu
-./v2-triage.sh
+./v3-monitor.sh
 ```
 
 ### Option B: Ghost Mode (Fileless Execution) 👻
 Running an audit on a remote server? Don't leave a footprint. This command downloads and executes the script directly in the machine's RAM.
 ```bash
-bash <(curl -sL https://raw.githubusercontent.com/nabilfp/linux-security-monitor/main/v2-triage.sh)
+bash <(curl -sL [https://raw.githubusercontent.com/nabilfp/linux-security-monitor/main/v3-monitor.sh](https://raw.githubusercontent.com/nabilfp/linux-security-monitor/main/v3-monitor.sh))
 ```
 
 ---
 
-## 🛠️ What's Inside v2.2?
+## 🛠️ What's Inside v3.0?
 
-- **Network Port Baselining (New!):** Takes a snapshot of your network perimeter. Run it again, and it uses set-theory mathematics to hunt down newly opened suspicious ports (e.g., Reverse Shells) and directly identifies the rogue process PIDs holding them open!
-- **Multilingual Bootloader (New!):** Select English, Bahasa Indonesia, or Mandarin (中文) at startup. The entire UI, including threat alerts and Sudo prompts, adapts instantly.
+- **SOAR Automation (New!):** Select option 5, and the script will copy itself to `/usr/local/bin` and inject a safe, root-level cronjob. It will run a headless audit every day at 02:00 AM, stripping ANSI colors to generate clean logs at `/var/log/linux-security-monitor.log`.
+- **Network Port Baselining:** Takes a snapshot of your network perimeter. Run it again, and it uses set-theory mathematics to hunt down newly opened suspicious ports (e.g., Reverse Shells) and directly identifies the rogue process PIDs holding them open.
+- **Multilingual Bootloader:** Select English, Bahasa Indonesia, or Mandarin (中文) at startup. The entire UI, including threat alerts and Sudo prompts, adapts instantly.
 - **High-Accuracy Health Telemetry:** 
   - **Battery:** Calculates true physical wear-level using manufacturer design capacity vs. current limits.
   - **RAM:** Reads raw memory pressure directly from `/proc/meminfo` to predict OOM (Out-of-Memory) risks.
   - **Storage:** Detects hardware-level "Read-Only" safety locks on failing NVMe/SATA SSDs.
 - **Smart Thermal Heuristics:** Automatically scans deep ACPI Thermal Zones. If hardware vendors hide their critical limits, the script automatically applies standard SOC safety heuristics.
-- **Anti-Observer Process Monitor:** The top CPU process tracker is smart enough to exclude itself from the list, preventing false alarms during threat hunting.
 
 ---
 
-## 🐛 Bug Fixes & Architecture Polish in v2.2
+## 🐛 Bug Fixes & Architecture Polish in v3.0
 
-- **i18n Matrix Implementation:** Solved the localization problem cleanly. Instead of bloated `if/else` UI printing, v2.2 uses a high-performance Language Dictionary Matrix loaded into memory before execution.
-- **Smart Battery Thresholds:** Fixed the scary "Not charging" status on business laptops (like ThinkPads) when Battery Conservation Mode is active. It now cross-references the AC adapter and identifies as `Plugged In (Idle)`.
-- **Dynamic Vendor Detection:** The thermal scanner now reads BIOS/DMI data to dynamically name your motherboard (e.g., ASUS, Dell, LENOVO).
-- **Ephemeral Baselining:** Network baseline snapshots are safely stored in `/tmp/` and are strictly linked to the OPSEC exit protocol (Option 5) to ensure zero forensic trace is left behind.
+- **Intelligent Ghost Mode Detection:** When setting up daily automation, the script now detects if it's running in RAM (Ghost Mode). If so, it dynamically fetches its own binary from GitHub to plant into the system securely.
+- **Persistent vs Ephemeral Baselines:** Network baselines were moved to `/var/tmp/` so they survive system reboots for the daily cronjob, but they are still safely shredded by the OPSEC exit protocol.
+- **Graceful Interrupts:** Implemented `trap` signals for `SIGINT/SIGTERM`. If you press `Ctrl+C`, the script exits gracefully instead of causing a runaway loop.
+- **i18n Matrix Implementation:** Solved the localization problem cleanly via a high-performance Language Dictionary Matrix loaded into memory before execution.
 
 ---
 
 ## ⚠️ Current Limitations
 
-- **Root Privileges:** Designed to run safely as a normal user. However, deep system logs (like certain failed SSH attempts via `journalctl`) and hardware limit overrides *require* `sudo` to display properly.
-- **Diagnostic, not a Daemon:** This is an active triage tool for quick audits, not a 24/7 background Intrusion Detection System. (Though automation is coming in Phase 2!)
+- **Root Privileges:** Deep system logs (like failed SSH attempts via `journalctl`), hardware limit overrides, and Cronjob installations *require* `sudo` to function properly.
+- **Point-in-Time Snapshot:** While v3.0 introduces daily automation, the auditing is snapshot-based (runs at a specific time), not a real-time kernel hook like eBPF.
 
 ---
 
@@ -84,7 +84,7 @@ We are always building. Here is the blueprint for turning this script into an En
 - [x] **v2.2 (Network Baselining):** Introduce a mechanism to compare current open ports with a saved baseline to automatically flag *new* suspicious ports or potential reverse shells.
 
 ### Phase 2: Automation & Threat Hunting
-- [ ] **v3.0 (Automation / SOAR):** Add an installation script to automatically set up a Linux `cronjob` for daily, hands-free background security auditing.
+- [x] **v3.0 (Automation / SOAR):** Add an installation script to automatically set up a Linux `cronjob` for daily, hands-free background security auditing.
 - [ ] **v3.1 (Proactive Threat Hunting):** Implement lightweight FIM (File Integrity Monitoring) using `sha256sum` to detect unauthorized modifications to critical system files (e.g., `/etc/passwd`, `/etc/shadow`).
 - [ ] **v3.2 (Forensic Extraction):** Add capabilities to scan temporary directories (like `/tmp/`) for disguised malware by reading *magic bytes* instead of relying on file extensions.
 
