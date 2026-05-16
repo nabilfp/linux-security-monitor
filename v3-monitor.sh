@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # ===========================================================================
-# Project        : Linux Security & System Monitor (v3.0.2-Global)
-# Description    : Enterprise SOAR Tool (Anti-Spam Stdin & Trap Fix)
+# Project        : Linux Security & System Monitor (v3.1-Global)
+# Description    : Enterprise SOAR & FIM (File Integrity Monitoring)
 # Author         : Nabil
 # Architecture   : Modular Bash (Dictionary Matrix, Headless Logic, Case Loop)
 # ===========================================================================
@@ -11,9 +11,9 @@
 trap 'echo -e "\n\n\033[0;31m[!] Execution aborted by user (Ctrl+C). Stay secure!\033[0m"; exit 1' SIGINT SIGTERM
 
 # --- [ ANTI-SPAM UTILITY: STDIN BUFFER VACUUM ] ---
-# Mengosongkan sisa teks di terminal akibat copy-paste tidak sengaja
+# Menyedot sisa teks dari clipboard paste yang masuk ke antrean terminal
 function clear_input_buffer() {
-    while read -r -t 0.01; do :; done
+    while read -r -t 0.1; do :; done
 }
 
 # --- [ HEADLESS CRON MODE (SOAR AUTOMATION) ] ---
@@ -37,6 +37,12 @@ if [[ "$1" == "--cron" ]]; then
     UI_BASE_OK="[V] No anomalous new ports detected. Network matches baseline."
     UI_BASE_ALERT="[!] ALERT: NEW UNRECOGNIZED PORTS DETECTED! Potential Backdoor!"
     UI_NEW_SUSP="[NEW / SUSPICIOUS]"
+    UI_FIM_EST="[V] FIM Baseline established for critical files!"
+    UI_FIM_VER="[*] Verifying critical system files integrity (FIM)..."
+    UI_FIM_OK="[V] System files integrity verified. No unauthorized changes."
+    UI_FIM_ALERT="[!] ALERT: CRITICAL FILE INTEGRITY BREACH DETECTED!"
+    UI_FIM_MOD="has been modified!"
+    UI_FIM_TIP="Tip: Use Option 6 to purge baselines if this was a legitimate system update."
 fi
 
 # --- [ UI COLOR VARIABLES (Interactive Mode) ] ---
@@ -54,7 +60,7 @@ function set_lang_en() {
     UI_MENU_TITLE="INTERACTIVE MENU"
     UI_OPT1="System Identity & GUI Telemetry"
     UI_OPT2="Hardware & Thermal Status (Deep Scan)"
-    UI_OPT3="Security & Threat Analysis (Network Baseline)"
+    UI_OPT3="Security & Threat Analysis (Network Baseline & FIM)"
     UI_OPT4="Execute Full System Audit"
     UI_OPT5="Automation / SOAR (Setup Daily Cronjob)"
     UI_OPT6="Exit & Destroy Trace (OPSEC)"
@@ -66,7 +72,7 @@ function set_lang_en() {
     UI_HDR_SYS="[*] SYSTEM IDENTITY & GUI TELEMETRY"
     UI_HDR_HW="[*] HARDWARE, HEALTH & STORAGE STATUS"
     UI_HDR_THERM="[*] THERMAL SENSORS & HARDWARE LIMITS"
-    UI_HDR_SEC="[*] SECURITY, THREAT & NETWORK BASELINE"
+    UI_HDR_SEC="[*] SECURITY, THREAT & BASELINES"
     UI_NET_EDGE="Network Edge"
     UI_HLT="Health"
     UI_BAD="Bad"
@@ -76,9 +82,15 @@ function set_lang_en() {
     UI_BASE_OK="[V] No anomalous new ports detected. Network matches baseline."
     UI_BASE_ALERT="[!] ALERT: NEW UNRECOGNIZED PORTS DETECTED! Potential Backdoor!"
     UI_NEW_SUSP="[NEW / SUSPICIOUS]"
+    UI_FIM_EST="[V] FIM Baseline established for critical files!"
+    UI_FIM_VER="[*] Verifying critical system files integrity (FIM)..."
+    UI_FIM_OK="[V] System files integrity verified. No unauthorized changes."
+    UI_FIM_ALERT="[!] ALERT: CRITICAL FILE INTEGRITY BREACH DETECTED!"
+    UI_FIM_MOD="has been modified!"
+    UI_FIM_TIP="Tip: Use Option 6 to purge baselines if this was a legitimate system update."
     UI_OPSEC_INIT="[!] Initiating OPSEC Cleanup Sequence..."
     UI_OPSEC_DO="[+] Purging memory, baselines, and sweeping directories..."
-    UI_OPSEC_DONE="[V] Baseline purged. Trace destroyed. Leave no trace."
+    UI_OPSEC_DONE="[V] Baselines purged. Trace destroyed. Leave no trace."
     UI_AUTO_SETUP="[*] Automating Security Audit (SOAR Setup)..."
     UI_AUTO_GHOST="[+] Ghost Mode detected. Fetching binary directly from repository..."
     UI_AUTO_SUCCESS="[V] Automation active! Background audits will run daily at 02:00 AM."
@@ -88,7 +100,7 @@ function set_lang_id() {
     UI_MENU_TITLE="MENU INTERAKTIF"
     UI_OPT1="Identitas Sistem & Telemetri GUI"
     UI_OPT2="Status Perangkat Keras & Suhu (Pindai Mendalam)"
-    UI_OPT3="Analisis Keamanan & Ancaman (Network Baseline)"
+    UI_OPT3="Analisis Keamanan & Ancaman (Network Baseline & FIM)"
     UI_OPT4="Jalankan Audit Sistem Penuh"
     UI_OPT5="Otomatisasi / SOAR (Pasang Cronjob Harian)"
     UI_OPT6="Keluar & Hapus Jejak (Protokol OPSEC)"
@@ -100,7 +112,7 @@ function set_lang_id() {
     UI_HDR_SYS="[*] IDENTITAS SISTEM & TELEMETRI GUI"
     UI_HDR_HW="[*] STATUS PERANGKAT KERAS, KESEHATAN & PENYIMPANAN"
     UI_HDR_THERM="[*] SENSOR SUHU & BATAS PERANGKAT KERAS"
-    UI_HDR_SEC="[*] KEAMANAN, ANCAMAN & NETWORK BASELINE"
+    UI_HDR_SEC="[*] KEAMANAN, ANCAMAN & BASELINE"
     UI_NET_EDGE="Ujung Jaringan"
     UI_HLT="Sehat"
     UI_BAD="Buruk"
@@ -110,6 +122,12 @@ function set_lang_id() {
     UI_BASE_OK="[V] Tidak ada port anomali. Jaringan aman sesuai baseline."
     UI_BASE_ALERT="[!] AWAS: PORT BARU TAK DIKENAL TERDETEKSI! Potensi Backdoor!"
     UI_NEW_SUSP="[BARU / MENCURIGAKAN]"
+    UI_FIM_EST="[V] Baseline FIM untuk file kritis berhasil dibuat!"
+    UI_FIM_VER="[*] Memverifikasi integritas file sistem kritis (FIM)..."
+    UI_FIM_OK="[V] Integritas file terverifikasi. Tidak ada modifikasi ilegal."
+    UI_FIM_ALERT="[!] AWAS: PELANGGARAN INTEGRITAS FILE KRITIS TERDETEKSI!"
+    UI_FIM_MOD="telah dimodifikasi!"
+    UI_FIM_TIP="Tip: Gunakan Opsi 6 untuk menghapus baseline jika ini adalah update sistem resmi."
     UI_OPSEC_INIT="[!] Memulai Sekuens Pembersihan OPSEC..."
     UI_OPSEC_DO="[+] Menghapus memori, baseline, dan membersihkan direktori..."
     UI_OPSEC_DONE="[V] Baseline dihapus. Jejak dihancurkan. Tanpa jejak."
@@ -122,7 +140,7 @@ function set_lang_zh() {
     UI_MENU_TITLE="交互式菜单 (INTERACTIVE MENU)"
     UI_OPT1="系统身份与 GUI 遥测"
     UI_OPT2="硬件与温度状态 (高精度扫描)"
-    UI_OPT3="安全与威胁分析 (网络基线)"
+    UI_OPT3="安全与威胁分析 (网络基线与 FIM)"
     UI_OPT4="执行完整系统审计"
     UI_OPT5="自动化 / SOAR (设置每日定时任务)"
     UI_OPT6="退出并销毁痕迹 (OPSEC 协议)"
@@ -134,7 +152,7 @@ function set_lang_zh() {
     UI_HDR_SYS="[*] 系统身份与 GUI 遥测"
     UI_HDR_HW="[*] 硬件、健康状况与存储状态"
     UI_HDR_THERM="[*] 温度传感器与硬件限制"
-    UI_HDR_SEC="[*] 安全、威胁与网络基线"
+    UI_HDR_SEC="[*] 安全、威胁与基线"
     UI_NET_EDGE="网络边缘"
     UI_HLT="健康"
     UI_BAD="危险"
@@ -144,6 +162,12 @@ function set_lang_zh() {
     UI_BASE_OK="[V] 未检测到异常的新端口。网络与基线匹配。"
     UI_BASE_ALERT="[!] 警告：检测到无法识别的新端口！潜在的后门！"
     UI_NEW_SUSP="[新 / 可疑]"
+    UI_FIM_EST="[V] 关键文件的 FIM 基线已建立！"
+    UI_FIM_VER="[*] 正在验证关键系统文件的完整性 (FIM)..."
+    UI_FIM_OK="[V] 系统文件完整性已验证。未发现未经授权的更改。"
+    UI_FIM_ALERT="[!] 警告：检测到关键文件完整性破坏！"
+    UI_FIM_MOD="已被修改！"
+    UI_FIM_TIP="提示：如果这是合法的系统更新，请使用选项 6 清除基线。"
     UI_OPSEC_INIT="[!] 正在启动 OPSEC 清理程序..."
     UI_OPSEC_DO="[+] 正在清除内存、基线并扫描目录..."
     UI_OPSEC_DONE="[V] 基线已清除。痕迹已销毁。不留痕迹。"
@@ -163,8 +187,8 @@ if [[ "$1" != "--cron" ]]; then
     echo -e "  3. Mandarin (中文)"
     echo -e "${CYAN}------------------------------------------------------${RESET}"
     
-    clear_input_buffer
     read -r -p "  [1-3]: " lang_choice || exit 1
+    clear_input_buffer # Execute vacuum immediately after read
 
     case $lang_choice in
         2) set_lang_id ;;
@@ -174,7 +198,7 @@ if [[ "$1" != "--cron" ]]; then
 
     printf '\033c'
     echo -e "${CYAN}======================================================${RESET}"
-    echo -e "${GREEN}   🛡️  LINUX SECURITY & HEALTH TRIAGE (v3.0.2-SOAR) 🛡️   ${RESET}"
+    echo -e "${GREEN}   🛡️  LINUX SECURITY & HEALTH TRIAGE (v3.1-SOAR) 🛡️   ${RESET}"
     echo -e "${CYAN}======================================================${RESET}"
     echo -e "${YELLOW}${UI_SUDO_REQ}${RESET}"
     sudo -v || { echo -e "${RED}${UI_SUDO_FAIL}${RESET}"; exit 1; }
@@ -351,7 +375,7 @@ function check_hardware() {
     fi
 }
 
-# --- [ FUNCTION 3: SECURITY & BASELINING ] ---
+# --- [ FUNCTION 3: SECURITY, THREATS & BASELINES ] ---
 function check_security() {
     echo -e "\n${YELLOW}${UI_HDR_SEC}${RESET}"
 
@@ -361,7 +385,8 @@ function check_security() {
     echo -e "\n${CYAN}[+] Active User Sessions:${RESET}"
     who
 
-    echo -e "\n${CYAN}[+] TCP/UDP Ports:${RESET}"
+    # --- NETWORK BASELINING ---
+    echo -e "\n${CYAN}[+] TCP/UDP Ports Baseline:${RESET}"
     BASELINE_FILE="/var/tmp/.v3_net_baseline.txt"
     
     sudo ss -tuln | awk 'NR>1 {print $1, $5}' | sort -u > /tmp/.v3_current_ports.txt
@@ -370,8 +395,6 @@ function check_security() {
         cp /tmp/.v3_current_ports.txt "$BASELINE_FILE"
         echo -e "${GREEN}${UI_BASE_EST}${RESET}"
         echo -e "    ${UI_BASE_SUB}"
-        echo -e "\n  Ports:"
-        while read p; do echo -e "    $p"; done < "$BASELINE_FILE"
     else
         echo -e "${YELLOW}${UI_BASE_COMP}${RESET}"
         
@@ -395,11 +418,39 @@ function check_security() {
             fi
         done < /tmp/.v3_current_ports.txt
     fi
+    rm -f /tmp/.v3_current_ports.txt
+
+    # --- FILE INTEGRITY MONITORING (FIM) ---
+    echo -e "\n${CYAN}[+] File Integrity Monitoring (FIM):${RESET}"
+    FIM_BASELINE="/var/tmp/.v3_fim_baseline.txt"
+    FIM_CURRENT="/tmp/.v3_current_fim.txt"
+    
+    # Hash critical authentication files
+    sudo sha256sum /etc/passwd /etc/shadow /etc/group /etc/sudoers 2>/dev/null > "$FIM_CURRENT"
+    
+    if [ ! -f "$FIM_BASELINE" ]; then
+        sudo cp "$FIM_CURRENT" "$FIM_BASELINE"
+        echo -e "${GREEN}${UI_FIM_EST}${RESET}"
+    else
+        echo -e "${YELLOW}${UI_FIM_VER}${RESET}"
+        
+        # Verify hashes
+        failed_files=$(sudo sha256sum --quiet -c "$FIM_BASELINE" 2>/dev/null | awk -F':' '{print $1}')
+        
+        if [ -z "$failed_files" ]; then
+            echo -e "${GREEN}${UI_FIM_OK}${RESET}"
+        else
+            echo -e "${RED}${BOLD}${UI_FIM_ALERT}${RESET}"
+            for f in $failed_files; do
+                echo -e "    ${RED}-> $f ${UI_FIM_MOD}${RESET}"
+            done
+            echo -e "  ${CYAN}${UI_FIM_TIP}${RESET}"
+        fi
+    fi
+    rm -f "$FIM_CURRENT"
 
     echo -e "\n${CYAN}[+] Top 3 CPU Processes:${RESET}"
     ps -eo pid,cmd,%cpu --sort=-%cpu | head -n 5 | grep -v "ps -eo" | head -n 4
-    
-    rm -f /tmp/.v3_current_ports.txt
 }
 
 # --- [ FUNCTION 4: AUTOMATION (SOAR) SETUP ] ---
@@ -410,12 +461,11 @@ function setup_automation() {
     CRON_PATH="/etc/cron.d/linux-security-monitor"
     LOG_PATH="/var/log/linux-security-monitor.log"
 
-    # Fix: Intelligent Physical vs Ghost Mode Detection
     if [[ -f "$0" ]]; then
         sudo cp "$0" "$BIN_PATH"
     else
         echo -e "${CYAN}    ${UI_AUTO_GHOST}${RESET}"
-        sudo curl -sL "https://raw.githubusercontent.com/nabilfp/linux-security-monitor/main/v2-triage.sh" -o "$BIN_PATH"
+        sudo curl -sL "https://raw.githubusercontent.com/nabilfp/linux-security-monitor/main/v3-monitor.sh" -o "$BIN_PATH"
     fi
 
     sudo chmod +x "$BIN_PATH"
@@ -437,6 +487,7 @@ function opsec_cleanup() {
     sleep 1.5
     
     sudo rm -f /var/tmp/.v3_net_baseline.txt
+    sudo rm -f /var/tmp/.v3_fim_baseline.txt
     
     if [[ "$(basename "$SCRIPT_DIR")" == *"linux-security-monitor"* ]]; then
         cd /tmp || exit
@@ -461,15 +512,15 @@ fi
 # --- [ UTILITY FUNCTION: PAUSE ] ---
 function pause_menu() {
     echo -e "\n${CYAN}======================================================${RESET}"
-    clear_input_buffer
     read -r -p "${UI_PAUSE}" || exit 1
+    clear_input_buffer # Execute vacuum after reading [ENTER]
 }
 
 # --- [ MAIN INTERACTIVE LOOP ] ---
 while true; do
     printf '\033c'
     echo -e "${CYAN}======================================================${RESET}"
-    echo -e "${GREEN}   🛡️  LINUX SECURITY & HEALTH TRIAGE (v3.0.2-SOAR) 🛡️   ${RESET}"
+    echo -e "${GREEN}   🛡️  LINUX SECURITY & HEALTH TRIAGE (v3.1-SOAR) 🛡️   ${RESET}"
     echo -e "${CYAN}======================================================${RESET}"
     echo -e "  ${BOLD}${UI_MENU_TITLE}${RESET}"
     echo -e "  1. ${UI_OPT1}"
@@ -480,9 +531,8 @@ while true; do
     echo -e "  6. ${UI_OPT6}"
     echo -e "${CYAN}------------------------------------------------------${RESET}"
     
-    # Menghapus paksa teks "sampah" / paste dari clipboard sebelum meminta input
-    clear_input_buffer
     read -r -p "  ${UI_PROMPT}" choice || exit 1
+    clear_input_buffer # Execute vacuum immediately after reading choice
     
     case $choice in
         1) printf '\033c'; check_system_identity; pause_menu ;;
