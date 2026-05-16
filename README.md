@@ -1,4 +1,4 @@
-# 🛡️ Linux Security Monitor (v3.1 FIM Edition)
+# 🛡️ Linux Security Monitor
 
 > A sleek, dependency-free Bash utility built for instant system health checks, hardware telemetry, and active security triage. Now featuring File Integrity Monitoring (FIM), SOAR Automation, Network Port Baselining, and OPSEC self-destruct capabilities.
 
