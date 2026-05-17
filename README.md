@@ -1,6 +1,6 @@
-# 🛡️ Linux Security Monitor
+# 🛡️ Linux Security Monitor (v3.2 Forensic Edition)
 
-> A sleek, dependency-free Bash utility built for instant system health checks, hardware telemetry, and active security triage. Now featuring File Integrity Monitoring (FIM), SOAR Automation, Network Port Baselining, and OPSEC self-destruct capabilities.
+> A sleek, dependency-free Bash utility built for instant system health checks, hardware telemetry, and active security triage. Now featuring Magic Bytes Forensic Extraction, File Integrity Monitoring (FIM), SOAR Automation, and Network Port Baselining.
 
 ---
 
@@ -10,13 +10,13 @@ Let's be real—monitoring a Linux server or your daily-driver laptop usually go
 
 As an Information Systems student diving deep into the Blue Team (SOC) side of cybersecurity, I wanted a third option. I needed a tool that acts like a quick "vibe check" for any Linux environment. Something you can drop into a server, run instantly without worrying about broken dependencies, and get a clean, human-readable breakdown of what's happening under the hood.
 
-**The Evolution to v3.1:**
-We started with a passive monitor (v1.0), moved to an active Threat Hunting tool (v2.2), and introduced headless daily automation (v3.0). But for the **v3.1 Update**, we stepped into the territory of a true Intrusion Detection System (IDS). The script now performs cryptographic hashing (FIM) to catch stealthy privilege escalation attempts.
+**The Evolution to v3.2:**
+We started with a passive monitor (v1.0), scaled into an automated SOAR platform (v3.0), and added cryptographic verification (v3.1). For the **v3.2 Forensic Update**, we integrated digital forensics and incident response (DFIR) capabilities. The script now bypasses deceptive file extensions entirely, stripping away malware cloaking techniques by analyzing raw file architecture directly inside volatile memory pathways.
 
 ### 🎯 Core Objectives of This Project
 - **Zero Bloatware:** No `npm install`, no Python virtual environments required. Just pure, native Bash.
 - **OPSEC-First (Leave No Trace):** A true auditor doesn't leave their tools behind. This update features ephemeral execution and a self-destruct mechanism to wipe both the project folder and temporary baselines upon exit.
-- **Proactive Defense:** Capable of establishing cryptographic baselines for critical system files to detect unauthorized modifications.
+- **Deep DFIR Triaging:** Unmasks stealthy advanced persistent threats (APTs) and rootkit payloads hiding in world-writable system spaces using strict signature analysis.
 
 ---
 
@@ -32,32 +32,28 @@ bash <(curl -sL https://raw.githubusercontent.com/nabilfp/linux-security-monitor
 
 ---
 
-## 🛠️ What's Inside v3.1?
+## 🛠️ What's Inside v3.2?
 
-- **File Integrity Monitoring (FIM) [New!]:** Generates `sha256sum` cryptographic hashes for critical authentication files (`/etc/passwd`, `/etc/shadow`, `/etc/sudoers`, `/etc/group`). If an attacker secretly creates a backdoor user, the FIM engine will immediately flag the breached integrity during the next audit.
-- **SOAR Automation:** Select option 5, and the script will copy itself to `/usr/local/bin` and inject a safe, root-level cronjob. It runs a headless audit every day at 02:00 AM, logging clean, color-stripped data to `/var/log/linux-security-monitor.log`.
+- **Forensic Extraction (Magic Bytes Scan) [New!]:** Actively hunts for hidden executable payloads inside world-writable volatile directories (`/tmp`, `/var/tmp`, `/dev/shm`). Instead of blindly relying on fishy extensions, it conducts signature matching against the file headers. If a binary is cross-dressed as a harmless image (e.g., `backdoor.jpg`), the engine flags the raw **ELF** architecture instantly.
+- **File Integrity Monitoring (FIM):** Generates `sha256sum` cryptographic hashes for critical authentication files (`/etc/passwd`, `/etc/shadow`, `/etc/sudoers`, `/etc/group`). If an attacker secretly creates a backdoor user or alters sudo permissions, the FIM engine catches it immediately.
+- **SOAR Automation:** Select option 5, and the script copies itself to `/usr/local/bin` and injects a root-level cronjob. It runs a headless audit every day at 02:00 AM, logging clean, color-stripped forensic logs to `/var/log/linux-security-monitor.log`.
 - **Network Port Baselining:** Takes a snapshot of your network perimeter. Run it again, and it uses set-theory mathematics to hunt down newly opened suspicious ports (e.g., Reverse Shells) and directly identifies the rogue process PIDs holding them open.
-- **Multilingual Bootloader:** Select English, Bahasa Indonesia, or Mandarin (中文) at startup. The entire UI adapts instantly using a dynamic dictionary matrix.
-- **High-Accuracy Health Telemetry:** - **Battery:** Calculates true physical wear-level using manufacturer design capacity vs. current limits.
-  - **RAM:** Reads raw memory pressure directly from `/proc/meminfo` to predict OOM risks.
-  - **Storage:** Detects hardware-level "Read-Only" safety locks on failing SSDs.
-- **Smart Thermal Heuristics:** Automatically scans deep ACPI Thermal Zones and applies standard SOC safety heuristics if vendors hide their hardware limits.
+- **Multilingual Bootloader:** Select English, Bahasa Indonesia, or Mandarin (中文) at startup. The entire UI adapts instantly using a high-performance memory-mapped language dictionary matrix.
 
 ---
 
-## 🐛 Bug Fixes & Architecture Polish in v3.1
+## 🐛 Bug Fixes & Architecture Polish in v3.2
 
-- **The Stdin Vacuum Cleaner:** Fixed a classic Bash edge-case where accidentally pasting large blocks of text into the interactive menu would cause an infinite spam loop. The script now utilizes a micro-timeout `read` function to instantly flush and vacuum the terminal buffer after user inputs.
-- **Persistent vs Ephemeral Baselines:** Both Network and FIM baselines are stored in `/var/tmp/` so they survive system reboots for the daily cronjob, but they are completely shredded when initiating the OPSEC exit protocol.
-- **Intelligent Ghost Mode Detection:** When setting up daily automation, the script detects if it's running in RAM (Ghost Mode) and dynamically fetches its own binary from GitHub to plant into the system safely.
-- **Graceful Interrupts:** Implemented `trap` signals for `SIGINT/SIGTERM`. Pressing `Ctrl+C` will exit the script gracefully without leaving ghost processes.
+- **The Stdin Buffer Vacuum:** Fixed a notorious Bash edge-case where pasting massive chunks of clipboard text into the interactive menu would trigger an infinite error-loop. The triage loop now deploys a precise micro-timeout vacuum immediately following execution to flush out standard input pollution.
+- **Volatile Directory Constraints:** Optimized the forensic scanner with a strict depth guard (`-maxdepth 3`) to ensure high-velocity directory sweeping without lagging the host machine's CPU pressure.
+- **Shred-on-Exit Architecture:** Network baselines, FIM crypto logs, and temporary structures are tightly chained to the OPSEC exit sequence (Option 6), leaving the targeted disk space cleanly remediated.
 
 ---
 
 ## ⚠️ Current Limitations
 
-- **Root Privileges:** Deep system logs, hardware limit overrides, FIM hashing for `/etc/shadow`, and Cronjob installations *require* `sudo` to function properly.
-- **Point-in-Time Snapshot:** While v3.1 features daily automation, the auditing is snapshot-based (runs at a specific scheduled time), not a real-time kernel hook like eBPF.
+- **Root Privileges:** Deep system logs, ACPI thermal zones, FIM shadow hashing, and Cronjob installations *require* `sudo` to function properly.
+- **Point-in-Time Snapshot:** The tool is designed for rapid point-in-time triage and scheduled compliance snapshots, rather than running as a persistent real-time kernel module handler (like eBPF or Auditd).
 
 ---
 
@@ -72,7 +68,7 @@ We are always building. Here is the blueprint for turning this script into an En
 ### Phase 2: Automation & Threat Hunting
 - [x] **v3.0 (Automation / SOAR):** Add an installation script to automatically set up a Linux `cronjob` for daily, hands-free background security auditing.
 - [x] **v3.1 (Proactive Threat Hunting):** Implement lightweight FIM (File Integrity Monitoring) using `sha256sum` to detect unauthorized modifications to critical system files (e.g., `/etc/passwd`, `/etc/shadow`).
-- [ ] **v3.2 (Forensic Extraction):** Add capabilities to scan temporary directories (like `/tmp/`) for disguised malware by reading *magic bytes* instead of relying on file extensions.
+- [x] **v3.2 (Forensic Extraction):** Add capabilities to scan temporary directories (like `/tmp/`) for disguised malware by reading *magic bytes* instead of relying on file extensions.
 
 ### Phase 3: Enterprise Integration
 - [ ] **v4.0 (Enterprise SIEM Ready):** Convert the plain-text audit logs into structured JSON payloads for modern SIEM platforms (Wazuh, Splunk, Elastic).
