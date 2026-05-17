@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # ===========================================================================
-# Project        : Linux Security & System Monitor (v3.1-Global)
-# Description    : Enterprise SOAR & FIM (File Integrity Monitoring)
+# Project        : Linux Security & System Monitor (v3.2-Global)
+# Description    : Enterprise SOAR, FIM & Forensic Extraction (Magic Bytes)
 # Author         : Nabil
 # Architecture   : Modular Bash (Dictionary Matrix, Headless Logic, Case Loop)
 # ===========================================================================
@@ -27,7 +27,7 @@ if [[ "$1" == "--cron" ]]; then
     UI_HDR_SYS="[*] SYSTEM IDENTITY & GUI TELEMETRY"
     UI_HDR_HW="[*] HARDWARE, HEALTH & STORAGE STATUS"
     UI_HDR_THERM="[*] THERMAL SENSORS & HARDWARE LIMITS"
-    UI_HDR_SEC="[*] SECURITY, THREAT & NETWORK BASELINE"
+    UI_HDR_SEC="[*] SECURITY, THREATS, BASELINES & FORENSICS"
     UI_NET_EDGE="Network Edge"
     UI_HLT="Health"
     UI_BAD="Bad"
@@ -43,6 +43,9 @@ if [[ "$1" == "--cron" ]]; then
     UI_FIM_ALERT="[!] ALERT: CRITICAL FILE INTEGRITY BREACH DETECTED!"
     UI_FIM_MOD="has been modified!"
     UI_FIM_TIP="Tip: Use Option 6 to purge baselines if this was a legitimate system update."
+    UI_FOR_HDR="Forensic Extraction (Magic Bytes Scan)"
+    UI_FOR_OK="[V] No disguised ELF executables found in temp directories."
+    UI_FOR_ALERT="[!] ALERT: SUSPICIOUS EXECUTABLES (ELF) FOUND IN TEMP DIRS!"
 fi
 
 # --- [ UI COLOR VARIABLES (Interactive Mode) ] ---
@@ -60,7 +63,7 @@ function set_lang_en() {
     UI_MENU_TITLE="INTERACTIVE MENU"
     UI_OPT1="System Identity & GUI Telemetry"
     UI_OPT2="Hardware & Thermal Status (Deep Scan)"
-    UI_OPT3="Security & Threat Analysis (Network Baseline & FIM)"
+    UI_OPT3="Security & Threat Analysis (Net, FIM, Forensics)"
     UI_OPT4="Execute Full System Audit"
     UI_OPT5="Automation / SOAR (Setup Daily Cronjob)"
     UI_OPT6="Exit & Destroy Trace (OPSEC)"
@@ -72,7 +75,7 @@ function set_lang_en() {
     UI_HDR_SYS="[*] SYSTEM IDENTITY & GUI TELEMETRY"
     UI_HDR_HW="[*] HARDWARE, HEALTH & STORAGE STATUS"
     UI_HDR_THERM="[*] THERMAL SENSORS & HARDWARE LIMITS"
-    UI_HDR_SEC="[*] SECURITY, THREAT & BASELINES"
+    UI_HDR_SEC="[*] SECURITY, THREATS, BASELINES & FORENSICS"
     UI_NET_EDGE="Network Edge"
     UI_HLT="Health"
     UI_BAD="Bad"
@@ -88,6 +91,9 @@ function set_lang_en() {
     UI_FIM_ALERT="[!] ALERT: CRITICAL FILE INTEGRITY BREACH DETECTED!"
     UI_FIM_MOD="has been modified!"
     UI_FIM_TIP="Tip: Use Option 6 to purge baselines if this was a legitimate system update."
+    UI_FOR_HDR="Forensic Extraction (Magic Bytes Scan)"
+    UI_FOR_OK="[V] No disguised ELF executables found in temp directories."
+    UI_FOR_ALERT="[!] ALERT: SUSPICIOUS EXECUTABLES (ELF) FOUND IN TEMP DIRS!"
     UI_OPSEC_INIT="[!] Initiating OPSEC Cleanup Sequence..."
     UI_OPSEC_DO="[+] Purging memory, baselines, and sweeping directories..."
     UI_OPSEC_DONE="[V] Baselines purged. Trace destroyed. Leave no trace."
@@ -100,7 +106,7 @@ function set_lang_id() {
     UI_MENU_TITLE="MENU INTERAKTIF"
     UI_OPT1="Identitas Sistem & Telemetri GUI"
     UI_OPT2="Status Perangkat Keras & Suhu (Pindai Mendalam)"
-    UI_OPT3="Analisis Keamanan & Ancaman (Network Baseline & FIM)"
+    UI_OPT3="Analisis Keamanan & Ancaman (Net, FIM, Forensik)"
     UI_OPT4="Jalankan Audit Sistem Penuh"
     UI_OPT5="Otomatisasi / SOAR (Pasang Cronjob Harian)"
     UI_OPT6="Keluar & Hapus Jejak (Protokol OPSEC)"
@@ -112,7 +118,7 @@ function set_lang_id() {
     UI_HDR_SYS="[*] IDENTITAS SISTEM & TELEMETRI GUI"
     UI_HDR_HW="[*] STATUS PERANGKAT KERAS, KESEHATAN & PENYIMPANAN"
     UI_HDR_THERM="[*] SENSOR SUHU & BATAS PERANGKAT KERAS"
-    UI_HDR_SEC="[*] KEAMANAN, ANCAMAN & BASELINE"
+    UI_HDR_SEC="[*] KEAMANAN, ANCAMAN, BASELINE & FORENSIK"
     UI_NET_EDGE="Ujung Jaringan"
     UI_HLT="Sehat"
     UI_BAD="Buruk"
@@ -128,6 +134,9 @@ function set_lang_id() {
     UI_FIM_ALERT="[!] AWAS: PELANGGARAN INTEGRITAS FILE KRITIS TERDETEKSI!"
     UI_FIM_MOD="telah dimodifikasi!"
     UI_FIM_TIP="Tip: Gunakan Opsi 6 untuk menghapus baseline jika ini adalah update sistem resmi."
+    UI_FOR_HDR="Ekstraksi Forensik (Pemindaian Magic Bytes)"
+    UI_FOR_OK="[V] Tidak ditemukan executable (ELF) tersembunyi di direktori temp."
+    UI_FOR_ALERT="[!] AWAS: EXECUTABLE MENCURIGAKAN (ELF) DITEMUKAN DI DIREKTORI TEMP!"
     UI_OPSEC_INIT="[!] Memulai Sekuens Pembersihan OPSEC..."
     UI_OPSEC_DO="[+] Menghapus memori, baseline, dan membersihkan direktori..."
     UI_OPSEC_DONE="[V] Baseline dihapus. Jejak dihancurkan. Tanpa jejak."
@@ -140,7 +149,7 @@ function set_lang_zh() {
     UI_MENU_TITLE="交互式菜单 (INTERACTIVE MENU)"
     UI_OPT1="系统身份与 GUI 遥测"
     UI_OPT2="硬件与温度状态 (高精度扫描)"
-    UI_OPT3="安全与威胁分析 (网络基线与 FIM)"
+    UI_OPT3="安全与威胁分析 (网络, FIM, 取证)"
     UI_OPT4="执行完整系统审计"
     UI_OPT5="自动化 / SOAR (设置每日定时任务)"
     UI_OPT6="退出并销毁痕迹 (OPSEC 协议)"
@@ -152,7 +161,7 @@ function set_lang_zh() {
     UI_HDR_SYS="[*] 系统身份与 GUI 遥测"
     UI_HDR_HW="[*] 硬件、健康状况与存储状态"
     UI_HDR_THERM="[*] 温度传感器与硬件限制"
-    UI_HDR_SEC="[*] 安全、威胁与基线"
+    UI_HDR_SEC="[*] 安全、威胁、基线与取证"
     UI_NET_EDGE="网络边缘"
     UI_HLT="健康"
     UI_BAD="危险"
@@ -168,6 +177,9 @@ function set_lang_zh() {
     UI_FIM_ALERT="[!] 警告：检测到关键文件完整性破坏！"
     UI_FIM_MOD="已被修改！"
     UI_FIM_TIP="提示：如果这是合法的系统更新，请使用选项 6 清除基线。"
+    UI_FOR_HDR="取证提取 (魔术字节扫描)"
+    UI_FOR_OK="[V] 在临时目录中未发现伪装的 ELF 可执行文件。"
+    UI_FOR_ALERT="[!] 警告：在临时目录中发现可疑的 ELF 可执行文件！"
     UI_OPSEC_INIT="[!] 正在启动 OPSEC 清理程序..."
     UI_OPSEC_DO="[+] 正在清除内存、基线并扫描目录..."
     UI_OPSEC_DONE="[V] 基线已清除。痕迹已销毁。不留痕迹。"
@@ -198,7 +210,7 @@ if [[ "$1" != "--cron" ]]; then
 
     printf '\033c'
     echo -e "${CYAN}======================================================${RESET}"
-    echo -e "${GREEN}   🛡️  LINUX SECURITY & HEALTH TRIAGE (v3.1-SOAR) 🛡️   ${RESET}"
+    echo -e "${GREEN}   🛡️  LINUX SECURITY & HEALTH TRIAGE (v3.2-SOAR) 🛡️   ${RESET}"
     echo -e "${CYAN}======================================================${RESET}"
     echo -e "${YELLOW}${UI_SUDO_REQ}${RESET}"
     sudo -v || { echo -e "${RED}${UI_SUDO_FAIL}${RESET}"; exit 1; }
@@ -375,7 +387,7 @@ function check_hardware() {
     fi
 }
 
-# --- [ FUNCTION 3: SECURITY, THREATS & BASELINES ] ---
+# --- [ FUNCTION 3: SECURITY, THREATS, BASELINES & FORENSICS ] ---
 function check_security() {
     echo -e "\n${YELLOW}${UI_HDR_SEC}${RESET}"
 
@@ -449,6 +461,24 @@ function check_security() {
     fi
     rm -f "$FIM_CURRENT"
 
+    # --- FORENSIC EXTRACTION (MAGIC BYTES) ---
+    echo -e "\n${CYAN}[+] ${UI_FOR_HDR}:${RESET}"
+    
+    # Scan maxdepth 3 in volatile memory/temp storage to prevent slow scanning, searching for hidden ELF binaries
+    suspicious_elf=$(sudo find /tmp /var/tmp /dev/shm -maxdepth 3 -type f -exec file {} + 2>/dev/null | grep -iw "ELF")
+    
+    if [ -z "$suspicious_elf" ]; then
+        echo -e "${GREEN}${UI_FOR_OK}${RESET}"
+    else
+        echo -e "${RED}${BOLD}${UI_FOR_ALERT}${RESET}"
+        echo "$suspicious_elf" | while IFS= read -r line; do
+            filepath=$(echo "$line" | cut -d':' -f1)
+            filetype=$(echo "$line" | cut -d':' -f2-)
+            # Triage output highlighting the rogue binary
+            echo -e "    ${RED}-> $filepath ${YELLOW}(Type:$filetype)${RESET}"
+        done
+    fi
+
     echo -e "\n${CYAN}[+] Top 3 CPU Processes:${RESET}"
     ps -eo pid,cmd,%cpu --sort=-%cpu | head -n 5 | grep -v "ps -eo" | head -n 4
 }
@@ -520,7 +550,7 @@ function pause_menu() {
 while true; do
     printf '\033c'
     echo -e "${CYAN}======================================================${RESET}"
-    echo -e "${GREEN}   🛡️  LINUX SECURITY & HEALTH TRIAGE (v3.1-SOAR) 🛡️   ${RESET}"
+    echo -e "${GREEN}   🛡️  LINUX SECURITY & HEALTH TRIAGE (v3.2-SOAR) 🛡️   ${RESET}"
     echo -e "${CYAN}======================================================${RESET}"
     echo -e "  ${BOLD}${UI_MENU_TITLE}${RESET}"
     echo -e "  1. ${UI_OPT1}"
