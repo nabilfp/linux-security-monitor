@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # ===========================================================================
-# Project        : Linux Security & System Monitor (v3.2-Global)
-# Description    : Enterprise SOAR, FIM & Forensic Extraction (Magic Bytes)
+# Project        : Linux Security & System Monitor (v4.0-Global)
+# Description    : Enterprise SIEM Ready (JSON), SOAR & Forensic IDS
 # Author         : Nabil
 # Architecture   : Modular Bash (Dictionary Matrix, Headless Logic, Case Loop)
 # ===========================================================================
@@ -11,61 +11,99 @@
 trap 'echo -e "\n\n\033[0;31m[!] Execution aborted by user (Ctrl+C). Stay secure!\033[0m"; exit 1' SIGINT SIGTERM
 
 # --- [ ANTI-SPAM UTILITY: STDIN BUFFER VACUUM ] ---
-# Menyedot sisa teks dari clipboard paste yang masuk ke antrean terminal
 function clear_input_buffer() {
     while read -r -t 0.1; do :; done
 }
 
-# --- [ HEADLESS CRON MODE (SOAR AUTOMATION) ] ---
+# --- [ HEADLESS CRON MODE (ENTERPRISE SIEM JSON PAYLOAD) ] ---
+# Di v4.0, eksekusi latar belakang tidak lagi mencetak teks manusia, melainkan murni JSON terstruktur.
 if [[ "$1" == "--cron" ]]; then
-    CYAN=''; GREEN=''; RED=''; YELLOW=''; BOLD=''; RESET=''
+    # 1. Metadata & Waktu (Format ISO 8601 standar SIEM)
+    TIMESTAMP=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+    HOSTNAME=$(hostname)
     
-    echo "======================================================"
-    echo "  [$(date +'%Y-%m-%d %H:%M:%S')] AUTOMATED SOC AUDIT"
-    echo "======================================================"
-    
-    UI_HDR_SYS="[*] SYSTEM IDENTITY & GUI TELEMETRY"
-    UI_HDR_HW="[*] HARDWARE, HEALTH & STORAGE STATUS"
-    UI_HDR_THERM="[*] THERMAL SENSORS & HARDWARE LIMITS"
-    UI_HDR_SEC="[*] SECURITY, THREATS, BASELINES & FORENSICS"
-    UI_NET_EDGE="Network Edge"
-    UI_HLT="Health"
-    UI_BAD="Bad"
-    UI_BASE_EST="[V] Initial network baseline established!"
-    UI_BASE_SUB="Subsequent checks will flag newly opened ports as suspicious."
-    UI_BASE_COMP="[*] Comparing current perimeter against saved baseline..."
-    UI_BASE_OK="[V] No anomalous new ports detected. Network matches baseline."
-    UI_BASE_ALERT="[!] ALERT: NEW UNRECOGNIZED PORTS DETECTED! Potential Backdoor!"
-    UI_NEW_SUSP="[NEW / SUSPICIOUS]"
-    UI_FIM_EST="[V] FIM Baseline established for critical files!"
-    UI_FIM_VER="[*] Verifying critical system files integrity (FIM)..."
-    UI_FIM_OK="[V] System files integrity verified. No unauthorized changes."
-    UI_FIM_ALERT="[!] ALERT: CRITICAL FILE INTEGRITY BREACH DETECTED!"
-    UI_FIM_MOD="has been modified!"
-    UI_FIM_TIP="Tip: Use Option 6 to purge baselines if this was a legitimate system update."
-    UI_FOR_HDR="Forensic Extraction (Magic Bytes Scan)"
-    UI_FOR_OK="[V] No disguised ELF executables found in temp directories."
-    UI_FOR_ALERT="[!] ALERT: SUSPICIOUS EXECUTABLES (ELF) FOUND IN TEMP DIRS!"
+    # 2. Identitas Sistem
+    OS_REL=$(cat /etc/os-release | grep "PRETTY_NAME" | cut -d'=' -f2 | tr -d '\"')
+    KERNEL=$(uname -r)
+    PUB_IP=$(curl -s --max-time 3 https://ifconfig.me || echo "Offline")
+
+    # 3. Telemetri Kinerja (Dikonversi ke persentase Integer)
+    MEM_TOTAL=$(awk '/MemTotal/ {print $2}' /proc/meminfo)
+    MEM_AVAIL=$(awk '/MemAvailable/ {print $2}' /proc/meminfo)
+    RAM_PCT=$(( 100 * (MEM_TOTAL - MEM_AVAIL) / MEM_TOTAL ))
+    DISK_PCT=$(df / | tail -n 1 | awk '{print $5}' | tr -d '%')
+
+    # 4. Keamanan Dasar
+    SSH_FAIL=$(sudo journalctl _SYSTEMD_UNIT=ssh.service 2>/dev/null | grep -c "Failed password" || echo 0)
+
+    # 5. Network Baselining (Pencari Anomali Port)
+    BASE_NET="/var/tmp/.v4_net_baseline.txt"
+    sudo ss -tuln | awk 'NR>1 {print $1, $5}' | sort -u > /tmp/.v4_curr_net.txt
+    PORTS_JSON=""
+    if [ -f "$BASE_NET" ]; then
+        NEW_PORTS=$(comm -13 "$BASE_NET" /tmp/.v4_curr_net.txt)
+        # Memformat hasil multi-baris menjadi array JSON string yang valid
+        PORTS_JSON=$(echo "$NEW_PORTS" | awk 'NF {printf "\"%s\",", $0}' | sed 's/,$//')
+    fi
+    rm -f /tmp/.v4_curr_net.txt
+
+    # 6. File Integrity Monitoring (FIM) Hash Check
+    BASE_FIM="/var/tmp/.v4_fim_baseline.txt"
+    sudo sha256sum /etc/passwd /etc/shadow /etc/group /etc/sudoers 2>/dev/null > /tmp/.v4_curr_fim.txt
+    FIM_JSON=""
+    if [ -f "$BASE_FIM" ]; then
+        FAILED_FIM=$(sudo sha256sum --quiet -c "$BASE_FIM" 2>/dev/null | awk -F':' '{print $1}')
+        FIM_JSON=$(echo "$FAILED_FIM" | awk 'NF {printf "\"%s\",", $0}' | sed 's/,$//')
+    fi
+    rm -f /tmp/.v4_curr_fim.txt
+
+    # 7. Ekstraksi Forensik (Pemindaian Magic Bytes ELF)
+    ELF_FILES=$(sudo find /tmp /var/tmp /dev/shm -maxdepth 3 -type f -exec file {} + 2>/dev/null | grep -iw "ELF" | cut -d':' -f1)
+    ELF_JSON=$(echo "$ELF_FILES" | awk 'NF {printf "\"%s\",", $0}' | sed 's/,$//')
+
+    # 8. Cetak Payload JSON Murni untuk SIEM (Tanpa Ketergantungan JQ)
+    cat <<EOF
+{
+  "timestamp": "$TIMESTAMP",
+  "host": "$HOSTNAME",
+  "system": {
+    "os": "$OS_REL",
+    "kernel": "$KERNEL",
+    "public_ip": "$PUB_IP"
+  },
+  "telemetry": {
+    "ram_usage_pct": $RAM_PCT,
+    "disk_usage_pct": $DISK_PCT
+  },
+  "security": {
+    "ssh_failed_logins": $SSH_FAIL,
+    "alerts": {
+      "new_ports_detected": [$PORTS_JSON],
+      "fim_breach_detected": [$FIM_JSON],
+      "suspicious_elf_found": [$ELF_JSON]
+    }
+  }
+}
+EOF
+    exit 0
 fi
 
 # --- [ UI COLOR VARIABLES (Interactive Mode) ] ---
-if [[ "$1" != "--cron" ]]; then
-    CYAN='\033[0;36m'
-    GREEN='\033[0;32m'
-    RED='\033[0;31m'
-    YELLOW='\033[1;33m'
-    BOLD='\033[1m'
-    RESET='\033[0m'
-fi
+CYAN='\033[0;36m'
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+BOLD='\033[1m'
+RESET='\033[0m'
 
 # --- [ LANGUAGE DICTIONARY (i18n) ] ---
 function set_lang_en() {
-    UI_MENU_TITLE="INTERACTIVE MENU"
+    UI_MENU_TITLE="ENTERPRISE SIEM EDITION (INTERACTIVE)"
     UI_OPT1="System Identity & GUI Telemetry"
     UI_OPT2="Hardware & Thermal Status (Deep Scan)"
-    UI_OPT3="Security & Threat Analysis (Net, FIM, Forensics)"
+    UI_OPT3="Security, FIM & Forensics (Magic Bytes)"
     UI_OPT4="Execute Full System Audit"
-    UI_OPT5="Automation / SOAR (Setup Daily Cronjob)"
+    UI_OPT5="Automation (Setup SIEM JSON Cronjob)"
     UI_OPT6="Exit & Destroy Trace (OPSEC)"
     UI_PROMPT="Select an option [1-6]: "
     UI_INVALID="[!] Invalid option. Please enter a valid number (1-6)."
@@ -97,18 +135,18 @@ function set_lang_en() {
     UI_OPSEC_INIT="[!] Initiating OPSEC Cleanup Sequence..."
     UI_OPSEC_DO="[+] Purging memory, baselines, and sweeping directories..."
     UI_OPSEC_DONE="[V] Baselines purged. Trace destroyed. Leave no trace."
-    UI_AUTO_SETUP="[*] Automating Security Audit (SOAR Setup)..."
+    UI_AUTO_SETUP="[*] Automating JSON Security Audit (SIEM SOAR Setup)..."
     UI_AUTO_GHOST="[+] Ghost Mode detected. Fetching binary directly from repository..."
-    UI_AUTO_SUCCESS="[V] Automation active! Background audits will run daily at 02:00 AM."
+    UI_AUTO_SUCCESS="[V] Automation active! JSON Audits will run daily at 02:00 AM."
 }
 
 function set_lang_id() {
-    UI_MENU_TITLE="MENU INTERAKTIF"
+    UI_MENU_TITLE="EDISI ENTERPRISE SIEM (INTERAKTIF)"
     UI_OPT1="Identitas Sistem & Telemetri GUI"
     UI_OPT2="Status Perangkat Keras & Suhu (Pindai Mendalam)"
-    UI_OPT3="Analisis Keamanan & Ancaman (Net, FIM, Forensik)"
+    UI_OPT3="Keamanan, FIM & Forensik (Magic Bytes)"
     UI_OPT4="Jalankan Audit Sistem Penuh"
-    UI_OPT5="Otomatisasi / SOAR (Pasang Cronjob Harian)"
+    UI_OPT5="Otomatisasi (Pasang Cronjob JSON SIEM)"
     UI_OPT6="Keluar & Hapus Jejak (Protokol OPSEC)"
     UI_PROMPT="Pilih opsi [1-6]: "
     UI_INVALID="[!] Pilihan tidak valid. Silakan masukkan angka 1 sampai 6."
@@ -140,18 +178,18 @@ function set_lang_id() {
     UI_OPSEC_INIT="[!] Memulai Sekuens Pembersihan OPSEC..."
     UI_OPSEC_DO="[+] Menghapus memori, baseline, dan membersihkan direktori..."
     UI_OPSEC_DONE="[V] Baseline dihapus. Jejak dihancurkan. Tanpa jejak."
-    UI_AUTO_SETUP="[*] Mengonfigurasi Audit Keamanan Otomatis (SOAR)..."
+    UI_AUTO_SETUP="[*] Mengonfigurasi Audit JSON Otomatis (Setup SIEM)..."
     UI_AUTO_GHOST="[+] Ghost Mode terdeteksi. Mengunduh binary langsung dari repositori..."
-    UI_AUTO_SUCCESS="[V] Otomatisasi aktif! Audit latar belakang akan berjalan tiap 02:00 pagi."
+    UI_AUTO_SUCCESS="[V] Otomatisasi aktif! Audit JSON akan berjalan tiap 02:00 pagi."
 }
 
 function set_lang_zh() {
-    UI_MENU_TITLE="交互式菜单 (INTERACTIVE MENU)"
+    UI_MENU_TITLE="企业级 SIEM 版本 (交互式)"
     UI_OPT1="系统身份与 GUI 遥测"
     UI_OPT2="硬件与温度状态 (高精度扫描)"
-    UI_OPT3="安全与威胁分析 (网络, FIM, 取证)"
+    UI_OPT3="安全、FIM 与取证 (魔术字节)"
     UI_OPT4="执行完整系统审计"
-    UI_OPT5="自动化 / SOAR (设置每日定时任务)"
+    UI_OPT5="自动化 (设置 SIEM JSON 定时任务)"
     UI_OPT6="退出并销毁痕迹 (OPSEC 协议)"
     UI_PROMPT="请选择一个选项 [1-6]: "
     UI_INVALID="[!] 无效选项。请输入 1 到 6 之间的正确数字。"
@@ -183,54 +221,48 @@ function set_lang_zh() {
     UI_OPSEC_INIT="[!] 正在启动 OPSEC 清理程序..."
     UI_OPSEC_DO="[+] 正在清除内存、基线并扫描目录..."
     UI_OPSEC_DONE="[V] 基线已清除。痕迹已销毁。不留痕迹。"
-    UI_AUTO_SETUP="[*] 正在设置自动化安全审计 (SOAR)..."
+    UI_AUTO_SETUP="[*] 正在设置自动化 JSON 审计 (SIEM 设置)..."
     UI_AUTO_GHOST="[+] 检测到 Ghost 模式。正在从存储库直接获取二进制文件..."
-    UI_AUTO_SUCCESS="[V] 自动化已激活！后台审计将每天凌晨 02:00 运行。"
+    UI_AUTO_SUCCESS="[V] 自动化已激活！JSON 审计将每天凌晨 02:00 运行。"
 }
 
 # --- [ INTERACTIVE BOOTLOADER ] ---
-if [[ "$1" != "--cron" ]]; then
-    printf '\033c'
-    echo -e "${CYAN}======================================================${RESET}"
-    echo -e "${GREEN} 🌍 SELECT YOUR LANGUAGE / PILIH BAHASA / 选择语言 🌍 ${RESET}"
-    echo -e "${CYAN}======================================================${RESET}"
-    echo -e "  1. English (Default)"
-    echo -e "  2. Bahasa Indonesia"
-    echo -e "  3. Mandarin (中文)"
-    echo -e "${CYAN}------------------------------------------------------${RESET}"
-    
-    read -r -p "  [1-3]: " lang_choice || exit 1
-    clear_input_buffer # Execute vacuum immediately after read
+printf '\033c'
+echo -e "${CYAN}======================================================${RESET}"
+echo -e "${GREEN} 🌍 SELECT YOUR LANGUAGE / PILIH BAHASA / 选择语言 🌍 ${RESET}"
+echo -e "${CYAN}======================================================${RESET}"
+echo -e "  1. English (Default)"
+echo -e "  2. Bahasa Indonesia"
+echo -e "  3. Mandarin (中文)"
+echo -e "${CYAN}------------------------------------------------------${RESET}"
 
-    case $lang_choice in
-        2) set_lang_id ;;
-        3) set_lang_zh ;;
-        *) set_lang_en ;;
-    esac
+read -r -p "  [1-3]: " lang_choice || exit 1
+clear_input_buffer 
 
-    printf '\033c'
-    echo -e "${CYAN}======================================================${RESET}"
-    echo -e "${GREEN}   🛡️  LINUX SECURITY & HEALTH TRIAGE (v3.2-SOAR) 🛡️   ${RESET}"
-    echo -e "${CYAN}======================================================${RESET}"
-    echo -e "${YELLOW}${UI_SUDO_REQ}${RESET}"
-    sudo -v || { echo -e "${RED}${UI_SUDO_FAIL}${RESET}"; exit 1; }
-fi
+case $lang_choice in
+    2) set_lang_id ;;
+    3) set_lang_zh ;;
+    *) set_lang_en ;;
+esac
 
-# --- [ FUNCTION 1: SYSTEM IDENTITY & FASTFETCH ] ---
+printf '\033c'
+echo -e "${CYAN}======================================================${RESET}"
+echo -e "${GREEN}   🛡️  LINUX SECURITY & HEALTH TRIAGE (v4.0-SIEM) 🛡️   ${RESET}"
+echo -e "${CYAN}======================================================${RESET}"
+echo -e "${YELLOW}${UI_SUDO_REQ}${RESET}"
+sudo -v || { echo -e "${RED}${UI_SUDO_FAIL}${RESET}"; exit 1; }
+
+# --- [ FUNCTION 1: SYSTEM IDENTITY ] ---
 function check_system_identity() {
     echo -e "\n${YELLOW}${UI_HDR_SYS}${RESET}"
-    
-    if command -v fastfetch &> /dev/null && [[ "$1" != "--cron" ]]; then
-        fastfetch
-    elif command -v neofetch &> /dev/null && [[ "$1" != "--cron" ]]; then
-        neofetch
+    if command -v fastfetch &> /dev/null; then fastfetch
+    elif command -v neofetch &> /dev/null; then neofetch
     else
         echo -e "OS Release  : $(cat /etc/os-release | grep "PRETTY_NAME" | cut -d'=' -f2 | tr -d '\"')"
         echo -e "Kernel      : $(uname -r)"
         echo -e "Uptime      : $(uptime -p)"
         echo -e "Shell       : $(basename "$SHELL")"
     fi
-    
     pub_ip=$(curl -s --max-time 3 https://ifconfig.me || echo "Offline / Unreachable")
     echo -e "\n${GREEN}[+] ${UI_NET_EDGE}: ${RESET}$pub_ip"
 }
@@ -238,43 +270,30 @@ function check_system_identity() {
 # --- [ FUNCTION 2: HARDWARE & THERMAL ] ---
 function check_hardware() {
     echo -e "\n${YELLOW}${UI_HDR_HW}${RESET}"
-
     bat_dir=$(ls -d /sys/class/power_supply/BAT* 2>/dev/null | head -1)
     if [ -n "$bat_dir" ]; then
         bat_status=$(cat "$bat_dir/status" 2>/dev/null)
         bat_cap=$(cat "$bat_dir/capacity" 2>/dev/null)
-        
         ac_online=$(grep -h "1" /sys/class/power_supply/*/online 2>/dev/null | head -1)
-        if [[ "$bat_status" == "Not charging" ]] && [[ -n "$ac_online" ]]; then
-            bat_status="Plugged In (Idle)"
-        fi
-        
+        if [[ "$bat_status" == "Not charging" ]] && [[ -n "$ac_online" ]]; then bat_status="Plugged In (Idle)"; fi
         design=$(sudo cat "$bat_dir/energy_full_design" 2>/dev/null || sudo cat "$bat_dir/charge_full_design" 2>/dev/null)
         current=$(sudo cat "$bat_dir/energy_full" 2>/dev/null || sudo cat "$bat_dir/charge_full" 2>/dev/null)
-        
         if [[ -n "$design" && -n "$current" && "$design" -gt 0 ]]; then
             health_pct=$(( 100 * current / design ))
             [ "$health_pct" -gt 100 ] && health_pct=100
             if [ "$health_pct" -ge 50 ]; then hlth_str="[ ${UI_HLT} : ${GREEN}${health_pct}%${RESET} ]"
             else hlth_str="[ ${UI_BAD} : ${RED}${health_pct}%${RESET} ]"; fi
-        else
-            hlth_str="[ ${UI_HLT} : N/A ]"
-        fi
+        else hlth_str="[ ${UI_HLT} : N/A ]"; fi
         echo -e "Battery     : ${bat_cap}% (${bat_status}) ${hlth_str}"
-    else
-        echo -e "Battery     : Not present"
-    fi
+    else echo -e "Battery     : Not present"; fi
 
     mem_total=$(awk '/MemTotal/ {print $2}' /proc/meminfo)
     mem_avail=$(awk '/MemAvailable/ {print $2}' /proc/meminfo)
-    
     if [[ -n "$mem_total" && -n "$mem_avail" ]]; then
         ram_health_pct=$(( 100 * mem_avail / mem_total ))
         if [ "$ram_health_pct" -ge 50 ]; then ram_str="[ ${UI_HLT} : ${GREEN}${ram_health_pct}%${RESET} ]"
         else ram_str="[ ${UI_BAD} : ${RED}${ram_health_pct}%${RESET} ]"; fi
-    else
-        ram_str="[ ${UI_HLT} : N/A ]"
-    fi
+    else ram_str="[ ${UI_HLT} : N/A ]"; fi
     
     mem_info=$(free -h | awk 'NR==2{printf "Used: %s / Total: %s", $3,$2 }')
     swap_info=$(free -h | awk 'NR==3{printf "Used: %s / Total: %s", $3,$2 }')
@@ -285,48 +304,37 @@ function check_hardware() {
     if [[ "$main_drive" == *"nvme"* ]]; then disk_type="NVMe SSD"
     else
         rota_check=$(sudo cat /sys/block/"$main_drive"/queue/rotational 2>/dev/null)
-        if [ "$rota_check" == "0" ]; then disk_type="SATA SSD"
-        else disk_type="HDD"; fi
+        if [ "$rota_check" == "0" ]; then disk_type="SATA SSD"; else disk_type="HDD"; fi
     fi
     
     root_usage=$(df -h / | tail -n 1 | awk '{print "Used: "$3" / Total: "$2" ("$5")"}')
     usage_pct=$(df / | tail -n 1 | awk '{print $5}' | tr -d '%')
     ro_flag=$(sudo cat /sys/block/"$main_drive"/ro 2>/dev/null || echo "0")
-    
     if [ "$ro_flag" == "1" ]; then storage_str="[ ${UI_BAD} : ${RED}0%${RESET} ]"
     elif [ "$usage_pct" -gt 90 ]; then free_space=$(( 100 - usage_pct )); storage_str="[ ${UI_BAD} : ${RED}${free_space}%${RESET} ]"
     else storage_str="[ ${UI_HLT} : ${GREEN}100%${RESET} ]"; fi
-
     echo -e "Storage (/) : $root_usage [Type: $disk_type] $storage_str"
 
     echo -e "\n${YELLOW}${UI_HDR_THERM}${RESET}"
     sys_vendor=$(sudo cat /sys/class/dmi/id/sys_vendor 2>/dev/null | awk '{print $1}')
     [ -z "$sys_vendor" ] && sys_vendor="System"
-    
     declare -A sensor_temps
     declare -A sensor_limits
-
     for hwmon_dir in /sys/class/hwmon/hwmon*; do
         [ ! -e "$hwmon_dir" ] && continue
         hwmon_name=$(sudo cat "$hwmon_dir/name" 2>/dev/null)
-        
         for input_file in "$hwmon_dir"/temp*_input; do
             [ ! -e "$input_file" ] && continue
             temp_raw=$(sudo cat "$input_file" 2>/dev/null)
             [ -z "$temp_raw" ] || [ "$temp_raw" -le 0 ] && continue
-            
             temp_c=$((temp_raw / 1000))
-            
             if [[ "${hwmon_name,,}" == *"k10temp"* ]]; then human_name="AMD Ryzen CPU"
             elif [[ "${hwmon_name,,}" == *"amdgpu"* ]]; then human_name="AMD Radeon GPU"
             elif [[ "${hwmon_name,,}" == "coretemp" ]]; then human_name="Intel CPU"
             elif [[ "${hwmon_name,,}" == *"mt7921"* || "${hwmon_name,,}" == *"mt7922"* || "${hwmon_name,,}" == *"iwlwifi"* ]]; then human_name="Wi-Fi Module"
             elif [[ "${hwmon_name,,}" == *"nvme"* ]]; then human_name="NVMe SSD"
-            elif [[ "${hwmon_name,,}" == *"acpitz"* || "${hwmon_name,,}" == *"thinkpad"* || "${hwmon_name,,}" == *"asus"* || "${hwmon_name,,}" == *"dell"* ]]; then 
-                human_name="${sys_vendor} Mainboard"
-            else human_name="$hwmon_name"
-            fi
-            
+            elif [[ "${hwmon_name,,}" == *"acpitz"* || "${hwmon_name,,}" == *"thinkpad"* || "${hwmon_name,,}" == *"asus"* || "${hwmon_name,,}" == *"dell"* ]]; then human_name="${sys_vendor} Mainboard"
+            else human_name="$hwmon_name"; fi
             limit="N/A"
             for ext in emergency crit max; do
                 lim_file="${input_file%_input}_${ext}"
@@ -335,14 +343,11 @@ function check_hardware() {
                     if [[ "$limit_raw" =~ ^[0-9]+$ ]] && [ "$limit_raw" -gt 0 ]; then
                         lim_c=$((limit_raw / 1000))
                         if [ "$lim_c" -lt 130 ] && [ "$lim_c" -gt 30 ]; then
-                            limit="${lim_c}°C"
-                            [ "$ext" == "max" ] && limit="${lim_c}°C (Max)"
-                            break
+                            limit="${lim_c}°C"; [ "$ext" == "max" ] && limit="${lim_c}°C (Max)"; break
                         fi
                     fi
                 fi
             done
-            
             if [ "$limit" == "N/A" ]; then
                 for zone in /sys/class/thermal/thermal_zone*; do
                     z_type=$(sudo cat "$zone/type" 2>/dev/null)
@@ -354,10 +359,7 @@ function check_hardware() {
                                 limit_raw=$(sudo cat "$trip_temp_file" 2>/dev/null)
                                 if [[ "$limit_raw" =~ ^[0-9]+$ ]] && [ "$limit_raw" -gt 0 ]; then
                                     lim_c=$((limit_raw / 1000))
-                                    if [ "$lim_c" -lt 130 ] && [ "$lim_c" -gt 30 ]; then
-                                        limit="${lim_c}°C (Zone)"
-                                        break 2
-                                    fi
+                                    if [ "$lim_c" -lt 130 ] && [ "$lim_c" -gt 30 ]; then limit="${lim_c}°C (Zone)"; break 2; fi
                                 fi
                             fi
                         done
@@ -368,18 +370,13 @@ function check_hardware() {
             [ "$limit" != "N/A" ] && sensor_limits["$human_name"]="$limit"
         done
     done
-
     if [ ${#sensor_temps[@]} -gt 0 ]; then
         mapfile -t sorted_keys < <(IFS=$'\n'; sort -f <<<"${!sensor_temps[*]}")
         for name in "${sorted_keys[@]}"; do
             lim="${sensor_limits[$name]:-N/A}"
             if [ "$lim" == "N/A" ]; then
                 case "${name,,}" in
-                    *cpu*) lim="95°C (Est)" ;;
-                    *gpu*) lim="90°C (Est)" ;;
-                    *nvme*|*ssd*) lim="70°C (Est)" ;;
-                    *wi-fi*|*wifi*) lim="80°C (Est)" ;;
-                    *) lim="85°C (Est)" ;;
+                    *cpu*) lim="95°C (Est)" ;; *gpu*) lim="90°C (Est)" ;; *nvme*|*ssd*) lim="70°C (Est)" ;; *wi-fi*|*wifi*) lim="80°C (Est)" ;; *) lim="85°C (Est)" ;;
                 esac
             fi
             printf "  %-20s : %-6s (Limit: %s)\n" "$name" "${sensor_temps[$name]}" "$lim"
@@ -387,170 +384,118 @@ function check_hardware() {
     fi
 }
 
-# --- [ FUNCTION 3: SECURITY, THREATS, BASELINES & FORENSICS ] ---
+# --- [ FUNCTION 3: SECURITY & FORENSICS ] ---
 function check_security() {
     echo -e "\n${YELLOW}${UI_HDR_SEC}${RESET}"
-
     failed_logins=$(sudo journalctl _SYSTEMD_UNIT=ssh.service 2>/dev/null | grep "Failed password" | wc -l || echo "N/A")
     echo -e "Failed SSH Logins : $failed_logins"
+    echo -e "\n${CYAN}[+] Active User Sessions:${RESET}"; who
 
-    echo -e "\n${CYAN}[+] Active User Sessions:${RESET}"
-    who
-
-    # --- NETWORK BASELINING ---
+    # NETWORK BASELINE
     echo -e "\n${CYAN}[+] TCP/UDP Ports Baseline:${RESET}"
-    BASELINE_FILE="/var/tmp/.v3_net_baseline.txt"
-    
-    sudo ss -tuln | awk 'NR>1 {print $1, $5}' | sort -u > /tmp/.v3_current_ports.txt
-    
+    BASELINE_FILE="/var/tmp/.v4_net_baseline.txt"
+    sudo ss -tuln | awk 'NR>1 {print $1, $5}' | sort -u > /tmp/.v4_current_ports.txt
     if [ ! -f "$BASELINE_FILE" ]; then
-        cp /tmp/.v3_current_ports.txt "$BASELINE_FILE"
-        echo -e "${GREEN}${UI_BASE_EST}${RESET}"
-        echo -e "    ${UI_BASE_SUB}"
+        cp /tmp/.v4_current_ports.txt "$BASELINE_FILE"
+        echo -e "${GREEN}${UI_BASE_EST}${RESET}\n    ${UI_BASE_SUB}"
     else
         echo -e "${YELLOW}${UI_BASE_COMP}${RESET}"
-        
-        new_ports=$(comm -13 "$BASELINE_FILE" /tmp/.v3_current_ports.txt)
-        closed_ports=$(comm -23 "$BASELINE_FILE" /tmp/.v3_current_ports.txt)
-        
-        if [ -z "$new_ports" ]; then
-            echo -e "${GREEN}${UI_BASE_OK}${RESET}"
-        else
-            echo -e "${RED}${BOLD}${UI_BASE_ALERT}${RESET}"
-        fi
-        
+        new_ports=$(comm -13 "$BASELINE_FILE" /tmp/.v4_current_ports.txt)
+        if [ -z "$new_ports" ]; then echo -e "${GREEN}${UI_BASE_OK}${RESET}"
+        else echo -e "${RED}${BOLD}${UI_BASE_ALERT}${RESET}"; fi
         echo -e "\n  Current State:"
         while read port; do
             if echo "$new_ports" | grep -F -q -x "$port"; then
                 pid_info=$(sudo ss -tulnp | grep -F "$port" | awk '{print $7}' | cut -d'"' -f2 | head -n 1)
                 [ -z "$pid_info" ] && pid_info="Unknown Process"
                 echo -e "    ${RED}${BOLD}$port  <-- ${UI_NEW_SUSP} (App: $pid_info)${RESET}"
-            else
-                echo -e "    ${GREEN}$port  (Baseline)${RESET}"
-            fi
-        done < /tmp/.v3_current_ports.txt
+            else echo -e "    ${GREEN}$port  (Baseline)${RESET}"; fi
+        done < /tmp/.v4_current_ports.txt
     fi
-    rm -f /tmp/.v3_current_ports.txt
+    rm -f /tmp/.v4_current_ports.txt
 
-    # --- FILE INTEGRITY MONITORING (FIM) ---
+    # FIM
     echo -e "\n${CYAN}[+] File Integrity Monitoring (FIM):${RESET}"
-    FIM_BASELINE="/var/tmp/.v3_fim_baseline.txt"
-    FIM_CURRENT="/tmp/.v3_current_fim.txt"
-    
-    # Hash critical authentication files
+    FIM_BASELINE="/var/tmp/.v4_fim_baseline.txt"
+    FIM_CURRENT="/tmp/.v4_current_fim.txt"
     sudo sha256sum /etc/passwd /etc/shadow /etc/group /etc/sudoers 2>/dev/null > "$FIM_CURRENT"
-    
     if [ ! -f "$FIM_BASELINE" ]; then
         sudo cp "$FIM_CURRENT" "$FIM_BASELINE"
         echo -e "${GREEN}${UI_FIM_EST}${RESET}"
     else
         echo -e "${YELLOW}${UI_FIM_VER}${RESET}"
-        
-        # Verify hashes
         failed_files=$(sudo sha256sum --quiet -c "$FIM_BASELINE" 2>/dev/null | awk -F':' '{print $1}')
-        
-        if [ -z "$failed_files" ]; then
-            echo -e "${GREEN}${UI_FIM_OK}${RESET}"
+        if [ -z "$failed_files" ]; then echo -e "${GREEN}${UI_FIM_OK}${RESET}"
         else
             echo -e "${RED}${BOLD}${UI_FIM_ALERT}${RESET}"
-            for f in $failed_files; do
-                echo -e "    ${RED}-> $f ${UI_FIM_MOD}${RESET}"
-            done
+            for f in $failed_files; do echo -e "    ${RED}-> $f ${UI_FIM_MOD}${RESET}"; done
             echo -e "  ${CYAN}${UI_FIM_TIP}${RESET}"
         fi
     fi
     rm -f "$FIM_CURRENT"
 
-    # --- FORENSIC EXTRACTION (MAGIC BYTES) ---
+    # FORENSICS
     echo -e "\n${CYAN}[+] ${UI_FOR_HDR}:${RESET}"
-    
-    # Scan maxdepth 3 in volatile memory/temp storage to prevent slow scanning, searching for hidden ELF binaries
     suspicious_elf=$(sudo find /tmp /var/tmp /dev/shm -maxdepth 3 -type f -exec file {} + 2>/dev/null | grep -iw "ELF")
-    
-    if [ -z "$suspicious_elf" ]; then
-        echo -e "${GREEN}${UI_FOR_OK}${RESET}"
+    if [ -z "$suspicious_elf" ]; then echo -e "${GREEN}${UI_FOR_OK}${RESET}"
     else
         echo -e "${RED}${BOLD}${UI_FOR_ALERT}${RESET}"
         echo "$suspicious_elf" | while IFS= read -r line; do
             filepath=$(echo "$line" | cut -d':' -f1)
             filetype=$(echo "$line" | cut -d':' -f2-)
-            # Triage output highlighting the rogue binary
             echo -e "    ${RED}-> $filepath ${YELLOW}(Type:$filetype)${RESET}"
         done
     fi
-
     echo -e "\n${CYAN}[+] Top 3 CPU Processes:${RESET}"
     ps -eo pid,cmd,%cpu --sort=-%cpu | head -n 5 | grep -v "ps -eo" | head -n 4
 }
 
-# --- [ FUNCTION 4: AUTOMATION (SOAR) SETUP ] ---
+# --- [ FUNCTION 4: SIEM AUTOMATION SETUP ] ---
 function setup_automation() {
     echo -e "\n${YELLOW}${UI_AUTO_SETUP}${RESET}"
-    
     BIN_PATH="/usr/local/bin/linux-security-monitor"
     CRON_PATH="/etc/cron.d/linux-security-monitor"
     LOG_PATH="/var/log/linux-security-monitor.log"
-
-    if [[ -f "$0" ]]; then
-        sudo cp "$0" "$BIN_PATH"
+    if [[ -f "$0" ]]; then sudo cp "$0" "$BIN_PATH"
     else
         echo -e "${CYAN}    ${UI_AUTO_GHOST}${RESET}"
-        sudo curl -sL "https://raw.githubusercontent.com/nabilfp/linux-security-monitor/main/v3-monitor.sh" -o "$BIN_PATH"
+        sudo curl -sL "https://raw.githubusercontent.com/nabilfp/linux-security-monitor/main/linux-security-monitor.sh" -o "$BIN_PATH"
     fi
-
     sudo chmod +x "$BIN_PATH"
-    
     echo "0 2 * * * root $BIN_PATH --cron >> $LOG_PATH 2>&1" | sudo tee "$CRON_PATH" > /dev/null
-    
     echo -e "${GREEN}${UI_AUTO_SUCCESS}${RESET}"
-    echo -e "${CYAN}    -> Log Path: $LOG_PATH${RESET}"
+    echo -e "${CYAN}    -> JSON Payload Path: $LOG_PATH${RESET}"
 }
 
-# --- [ FUNCTION 5: OPSEC SELF-DESTRUCT ] ---
+# --- [ FUNCTION 5: OPSEC ] ---
 function opsec_cleanup() {
     echo -e "\n${YELLOW}${UI_OPSEC_INIT}${RESET}"
-    
     SCRIPT_DIR=$(dirname "$(realpath "$0")")
     SCRIPT_NAME=$(basename "$0")
-    
     echo -e "${CYAN}${UI_OPSEC_DO}${RESET}"
     sleep 1.5
-    
-    sudo rm -f /var/tmp/.v3_net_baseline.txt
-    sudo rm -f /var/tmp/.v3_fim_baseline.txt
-    
+    sudo rm -f /var/tmp/.v4_net_baseline.txt
+    sudo rm -f /var/tmp/.v4_fim_baseline.txt
     if [[ "$(basename "$SCRIPT_DIR")" == *"linux-security-monitor"* ]]; then
-        cd /tmp || exit
-        rm -rf "$SCRIPT_DIR"
-        echo -e "${GREEN}${UI_OPSEC_DONE}${RESET}\n"
+        cd /tmp || exit; rm -rf "$SCRIPT_DIR"; echo -e "${GREEN}${UI_OPSEC_DONE}${RESET}\n"
     else
-        rm -f "$SCRIPT_DIR/$SCRIPT_NAME"
-        echo -e "${GREEN}${UI_OPSEC_DONE}${RESET}\n"
+        rm -f "$SCRIPT_DIR/$SCRIPT_NAME"; echo -e "${GREEN}${UI_OPSEC_DONE}${RESET}\n"
     fi
     exit 0
 }
 
-# --- [ EXECUTE HEADLESS CRON IF FLAG PRESENT ] ---
-if [[ "$1" == "--cron" ]]; then
-    check_system_identity
-    check_hardware
-    check_security
-    echo -e "\n"
-    exit 0
-fi
-
-# --- [ UTILITY FUNCTION: PAUSE ] ---
+# --- [ MENU UTILS ] ---
 function pause_menu() {
     echo -e "\n${CYAN}======================================================${RESET}"
     read -r -p "${UI_PAUSE}" || exit 1
-    clear_input_buffer # Execute vacuum after reading [ENTER]
+    clear_input_buffer
 }
 
-# --- [ MAIN INTERACTIVE LOOP ] ---
+# --- [ MAIN LOOP ] ---
 while true; do
     printf '\033c'
     echo -e "${CYAN}======================================================${RESET}"
-    echo -e "${GREEN}   🛡️  LINUX SECURITY & HEALTH TRIAGE (v3.2-SOAR) 🛡️   ${RESET}"
+    echo -e "${GREEN}   🛡️  LINUX SECURITY & HEALTH TRIAGE (v4.0-SIEM) 🛡️   ${RESET}"
     echo -e "${CYAN}======================================================${RESET}"
     echo -e "  ${BOLD}${UI_MENU_TITLE}${RESET}"
     echo -e "  1. ${UI_OPT1}"
@@ -560,21 +505,13 @@ while true; do
     echo -e "  5. ${UI_OPT5}"
     echo -e "  6. ${UI_OPT6}"
     echo -e "${CYAN}------------------------------------------------------${RESET}"
-    
     read -r -p "  ${UI_PROMPT}" choice || exit 1
-    clear_input_buffer # Execute vacuum immediately after reading choice
-    
+    clear_input_buffer
     case $choice in
         1) printf '\033c'; check_system_identity; pause_menu ;;
         2) printf '\033c'; check_hardware; pause_menu ;;
         3) printf '\033c'; check_security; pause_menu ;;
-        4) 
-            printf '\033c'
-            check_system_identity
-            check_hardware
-            check_security
-            pause_menu
-            ;;
+        4) printf '\033c'; check_system_identity; check_hardware; check_security; pause_menu ;;
         5) setup_automation; pause_menu ;;
         6) opsec_cleanup ;;
         *) echo -e "\n${RED}${UI_INVALID}${RESET}"; sleep 1.5 ;;
