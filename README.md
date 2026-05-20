@@ -25,7 +25,7 @@ We started with a passive monitor (v1.0), scaled into an automated SOAR platform
 No installation required. A true auditor doesn't leave a footprint. This command downloads and executes the script directly in your machine's RAM without saving a single file to your hard drive.
 
 ```bash
-bash <(curl -sL [https://raw.githubusercontent.com/nabilfp/linux-security-monitor/main/linux-security-monitor.sh](https://raw.githubusercontent.com/nabilfp/linux-security-monitor/main/linux-security-monitor.sh))
+bash <(curl -sL https://raw.githubusercontent.com/nabilfp/linux-security-monitor/main/v4-monitor.sh)
 ```
 
 *(Note: If you decide to set up Daily SOAR Automation inside the interactive menu, the script will automatically fetch its own binary and safely implant it into `/usr/local/bin/`.)*
