@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # ===========================================================================
-# Project        : Linux Security & System Monitor (v4.0-Global)
-# Description    : Enterprise SIEM Ready (JSON), SOAR & Forensic IDS
+# Project        : Linux Security & System Monitor (v4.1-Global)
+# Description    : Enterprise SIEM (JSON), FIM, Forensics & CIS Auditing
 # Author         : Nabil
 # Architecture   : Modular Bash (Dictionary Matrix, Headless Logic, Case Loop)
 # ===========================================================================
@@ -16,9 +16,8 @@ function clear_input_buffer() {
 }
 
 # --- [ HEADLESS CRON MODE (ENTERPRISE SIEM JSON PAYLOAD) ] ---
-# Di v4.0, eksekusi latar belakang tidak lagi mencetak teks manusia, melainkan murni JSON terstruktur.
 if [[ "$1" == "--cron" ]]; then
-    # 1. Metadata & Waktu (Format ISO 8601 standar SIEM)
+    # 1. Metadata & Waktu (ISO 8601)
     TIMESTAMP=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
     HOSTNAME=$(hostname)
     
@@ -27,7 +26,7 @@ if [[ "$1" == "--cron" ]]; then
     KERNEL=$(uname -r)
     PUB_IP=$(curl -s --max-time 3 https://ifconfig.me || echo "Offline")
 
-    # 3. Telemetri Kinerja (Dikonversi ke persentase Integer)
+    # 3. Telemetri Kinerja
     MEM_TOTAL=$(awk '/MemTotal/ {print $2}' /proc/meminfo)
     MEM_AVAIL=$(awk '/MemAvailable/ {print $2}' /proc/meminfo)
     RAM_PCT=$(( 100 * (MEM_TOTAL - MEM_AVAIL) / MEM_TOTAL ))
@@ -36,18 +35,17 @@ if [[ "$1" == "--cron" ]]; then
     # 4. Keamanan Dasar
     SSH_FAIL=$(sudo journalctl _SYSTEMD_UNIT=ssh.service 2>/dev/null | grep -c "Failed password" || echo 0)
 
-    # 5. Network Baselining (Pencari Anomali Port)
+    # 5. Network Baselining
     BASE_NET="/var/tmp/.v4_net_baseline.txt"
     sudo ss -tuln | awk 'NR>1 {print $1, $5}' | sort -u > /tmp/.v4_curr_net.txt
     PORTS_JSON=""
     if [ -f "$BASE_NET" ]; then
         NEW_PORTS=$(comm -13 "$BASE_NET" /tmp/.v4_curr_net.txt)
-        # Memformat hasil multi-baris menjadi array JSON string yang valid
         PORTS_JSON=$(echo "$NEW_PORTS" | awk 'NF {printf "\"%s\",", $0}' | sed 's/,$//')
     fi
     rm -f /tmp/.v4_curr_net.txt
 
-    # 6. File Integrity Monitoring (FIM) Hash Check
+    # 6. FIM Hash Check
     BASE_FIM="/var/tmp/.v4_fim_baseline.txt"
     sudo sha256sum /etc/passwd /etc/shadow /etc/group /etc/sudoers 2>/dev/null > /tmp/.v4_curr_fim.txt
     FIM_JSON=""
@@ -57,11 +55,17 @@ if [[ "$1" == "--cron" ]]; then
     fi
     rm -f /tmp/.v4_curr_fim.txt
 
-    # 7. Ekstraksi Forensik (Pemindaian Magic Bytes ELF)
+    # 7. Ekstraksi Forensik (Magic Bytes)
     ELF_FILES=$(sudo find /tmp /var/tmp /dev/shm -maxdepth 3 -type f -exec file {} + 2>/dev/null | grep -iw "ELF" | cut -d':' -f1)
     ELF_JSON=$(echo "$ELF_FILES" | awk 'NF {printf "\"%s\",", $0}' | sed 's/,$//')
 
-    # 8. Cetak Payload JSON Murni untuk SIEM (Tanpa Ketergantungan JQ)
+    # 8. CIS Auditing (Level 1 Server Benchmarks)
+    CIS_ASLR=$( [ "$(cat /proc/sys/kernel/randomize_va_space 2>/dev/null)" == "2" ] && echo "true" || echo "false" )
+    CIS_IPFWD=$( [ "$(cat /proc/sys/net/ipv4/ip_forward 2>/dev/null)" == "0" ] && echo "true" || echo "false" )
+    CIS_SSH_ROOT=$( sudo sshd -T 2>/dev/null | grep -iq "permitrootlogin no" && echo "true" || echo "false" )
+    CIS_SSH_EMPTY=$( sudo sshd -T 2>/dev/null | grep -iq "permitemptypasswords no" && echo "true" || echo "false" )
+
+    # 9. Cetak Payload JSON Murni
     cat <<EOF
 {
   "timestamp": "$TIMESTAMP",
@@ -81,6 +85,12 @@ if [[ "$1" == "--cron" ]]; then
       "new_ports_detected": [$PORTS_JSON],
       "fim_breach_detected": [$FIM_JSON],
       "suspicious_elf_found": [$ELF_JSON]
+    },
+    "cis_benchmarks": {
+      "aslr_enabled": $CIS_ASLR,
+      "ipv4_forwarding_disabled": $CIS_IPFWD,
+      "ssh_root_login_disabled": $CIS_SSH_ROOT,
+      "ssh_empty_pass_disabled": $CIS_SSH_EMPTY
     }
   }
 }
@@ -98,10 +108,10 @@ RESET='\033[0m'
 
 # --- [ LANGUAGE DICTIONARY (i18n) ] ---
 function set_lang_en() {
-    UI_MENU_TITLE="ENTERPRISE SIEM EDITION (INTERACTIVE)"
+    UI_MENU_TITLE="ENTERPRISE SIEM & CIS EDITION"
     UI_OPT1="System Identity & GUI Telemetry"
     UI_OPT2="Hardware & Thermal Status (Deep Scan)"
-    UI_OPT3="Security, FIM & Forensics (Magic Bytes)"
+    UI_OPT3="Security, Forensics & CIS Benchmarks"
     UI_OPT4="Execute Full System Audit"
     UI_OPT5="Automation (Setup SIEM JSON Cronjob)"
     UI_OPT6="Exit & Destroy Trace (OPSEC)"
@@ -132,6 +142,9 @@ function set_lang_en() {
     UI_FOR_HDR="Forensic Extraction (Magic Bytes Scan)"
     UI_FOR_OK="[V] No disguised ELF executables found in temp directories."
     UI_FOR_ALERT="[!] ALERT: SUSPICIOUS EXECUTABLES (ELF) FOUND IN TEMP DIRS!"
+    UI_CIS_HDR="CIS Benchmarks Auditing (Level 1 Server)"
+    UI_CIS_PASS="[PASS]"
+    UI_CIS_FAIL="[FAIL]"
     UI_OPSEC_INIT="[!] Initiating OPSEC Cleanup Sequence..."
     UI_OPSEC_DO="[+] Purging memory, baselines, and sweeping directories..."
     UI_OPSEC_DONE="[V] Baselines purged. Trace destroyed. Leave no trace."
@@ -141,10 +154,10 @@ function set_lang_en() {
 }
 
 function set_lang_id() {
-    UI_MENU_TITLE="EDISI ENTERPRISE SIEM (INTERAKTIF)"
+    UI_MENU_TITLE="EDISI ENTERPRISE SIEM & CIS"
     UI_OPT1="Identitas Sistem & Telemetri GUI"
     UI_OPT2="Status Perangkat Keras & Suhu (Pindai Mendalam)"
-    UI_OPT3="Keamanan, FIM & Forensik (Magic Bytes)"
+    UI_OPT3="Keamanan, Forensik & CIS Benchmarks"
     UI_OPT4="Jalankan Audit Sistem Penuh"
     UI_OPT5="Otomatisasi (Pasang Cronjob JSON SIEM)"
     UI_OPT6="Keluar & Hapus Jejak (Protokol OPSEC)"
@@ -175,6 +188,9 @@ function set_lang_id() {
     UI_FOR_HDR="Ekstraksi Forensik (Pemindaian Magic Bytes)"
     UI_FOR_OK="[V] Tidak ditemukan executable (ELF) tersembunyi di direktori temp."
     UI_FOR_ALERT="[!] AWAS: EXECUTABLE MENCURIGAKAN (ELF) DITEMUKAN DI DIREKTORI TEMP!"
+    UI_CIS_HDR="Audit CIS Benchmarks (Server Level 1)"
+    UI_CIS_PASS="[LULUS]"
+    UI_CIS_FAIL="[GAGAL]"
     UI_OPSEC_INIT="[!] Memulai Sekuens Pembersihan OPSEC..."
     UI_OPSEC_DO="[+] Menghapus memori, baseline, dan membersihkan direktori..."
     UI_OPSEC_DONE="[V] Baseline dihapus. Jejak dihancurkan. Tanpa jejak."
@@ -184,10 +200,10 @@ function set_lang_id() {
 }
 
 function set_lang_zh() {
-    UI_MENU_TITLE="企业级 SIEM 版本 (交互式)"
+    UI_MENU_TITLE="企业级 SIEM 与 CIS 版本"
     UI_OPT1="系统身份与 GUI 遥测"
     UI_OPT2="硬件与温度状态 (高精度扫描)"
-    UI_OPT3="安全、FIM 与取证 (魔术字节)"
+    UI_OPT3="安全、取证与 CIS 基准测试"
     UI_OPT4="执行完整系统审计"
     UI_OPT5="自动化 (设置 SIEM JSON 定时任务)"
     UI_OPT6="退出并销毁痕迹 (OPSEC 协议)"
@@ -218,6 +234,9 @@ function set_lang_zh() {
     UI_FOR_HDR="取证提取 (魔术字节扫描)"
     UI_FOR_OK="[V] 在临时目录中未发现伪装的 ELF 可执行文件。"
     UI_FOR_ALERT="[!] 警告：在临时目录中发现可疑的 ELF 可执行文件！"
+    UI_CIS_HDR="CIS 基准测试审计 (服务器级别 1)"
+    UI_CIS_PASS="[通过]"
+    UI_CIS_FAIL="[失败]"
     UI_OPSEC_INIT="[!] 正在启动 OPSEC 清理程序..."
     UI_OPSEC_DO="[+] 正在清除内存、基线并扫描目录..."
     UI_OPSEC_DONE="[V] 基线已清除。痕迹已销毁。不留痕迹。"
@@ -247,7 +266,7 @@ esac
 
 printf '\033c'
 echo -e "${CYAN}======================================================${RESET}"
-echo -e "${GREEN}   🛡️  LINUX SECURITY & HEALTH TRIAGE (v4.0-SIEM) 🛡️   ${RESET}"
+echo -e "${GREEN}   🛡️  LINUX SECURITY & HEALTH TRIAGE (v4.1-CIS) 🛡️    ${RESET}"
 echo -e "${CYAN}======================================================${RESET}"
 echo -e "${YELLOW}${UI_SUDO_REQ}${RESET}"
 sudo -v || { echo -e "${RED}${UI_SUDO_FAIL}${RESET}"; exit 1; }
@@ -384,7 +403,7 @@ function check_hardware() {
     fi
 }
 
-# --- [ FUNCTION 3: SECURITY & FORENSICS ] ---
+# --- [ FUNCTION 3: SECURITY, FORENSICS & CIS AUDITING ] ---
 function check_security() {
     echo -e "\n${YELLOW}${UI_HDR_SEC}${RESET}"
     failed_logins=$(sudo journalctl _SYSTEMD_UNIT=ssh.service 2>/dev/null | grep "Failed password" | wc -l || echo "N/A")
@@ -446,6 +465,38 @@ function check_security() {
             echo -e "    ${RED}-> $filepath ${YELLOW}(Type:$filetype)${RESET}"
         done
     fi
+
+    # CIS BENCHMARKS AUDITING
+    echo -e "\n${CYAN}[+] ${UI_CIS_HDR}:${RESET}"
+    
+    # 1. Check ASLR
+    if [ "$(cat /proc/sys/kernel/randomize_va_space 2>/dev/null)" == "2" ]; then
+        echo -e "    ${GREEN}${UI_CIS_PASS}${RESET} Kernel ASLR Protection (Enabled)"
+    else
+        echo -e "    ${RED}${BOLD}${UI_CIS_FAIL}${RESET} Kernel ASLR Protection (Disabled/Weak)"
+    fi
+    
+    # 2. Check IPv4 Forwarding
+    if [ "$(cat /proc/sys/net/ipv4/ip_forward 2>/dev/null)" == "0" ]; then
+        echo -e "    ${GREEN}${UI_CIS_PASS}${RESET} IPv4 Forwarding (Disabled)"
+    else
+        echo -e "    ${RED}${BOLD}${UI_CIS_FAIL}${RESET} IPv4 Forwarding (Enabled - Security Risk)"
+    fi
+    
+    # 3. Check SSH Root Login
+    if sudo sshd -T 2>/dev/null | grep -iq "permitrootlogin no"; then
+        echo -e "    ${GREEN}${UI_CIS_PASS}${RESET} SSH Root Login (Disabled)"
+    else
+        echo -e "    ${RED}${BOLD}${UI_CIS_FAIL}${RESET} SSH Root Login (Permitted - Critical Risk)"
+    fi
+    
+    # 4. Check SSH Empty Passwords
+    if sudo sshd -T 2>/dev/null | grep -iq "permitemptypasswords no"; then
+        echo -e "    ${GREEN}${UI_CIS_PASS}${RESET} SSH Empty Passwords (Disabled)"
+    else
+        echo -e "    ${RED}${BOLD}${UI_CIS_FAIL}${RESET} SSH Empty Passwords (Permitted - Critical Risk)"
+    fi
+
     echo -e "\n${CYAN}[+] Top 3 CPU Processes:${RESET}"
     ps -eo pid,cmd,%cpu --sort=-%cpu | head -n 5 | grep -v "ps -eo" | head -n 4
 }
@@ -495,7 +546,7 @@ function pause_menu() {
 while true; do
     printf '\033c'
     echo -e "${CYAN}======================================================${RESET}"
-    echo -e "${GREEN}   🛡️  LINUX SECURITY & HEALTH TRIAGE (v4.0-SIEM) 🛡️   ${RESET}"
+    echo -e "${GREEN}   🛡️  LINUX SECURITY & HEALTH TRIAGE (v4.1-CIS) 🛡️    ${RESET}"
     echo -e "${CYAN}======================================================${RESET}"
     echo -e "  ${BOLD}${UI_MENU_TITLE}${RESET}"
     echo -e "  1. ${UI_OPT1}"
